@@ -2,6 +2,12 @@ package library;
 
 import static executionEngine.DriverScript.OR;
 
+import java.awt.AWTException;
+import java.awt.Robot;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -18,17 +24,23 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 //import OpenQA.Selenium.Interactions;
 
+import javax.net.ssl.HttpsURLConnection;
 import javax.swing.JOptionPane;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.time.StopWatch;
+import org.apache.tools.ant.types.CommandlineJava.SysProperties;
 import org.junit.Assert;
 import org.openqa.selenium.Alert;
 import org.openqa.selenium.By;
@@ -44,6 +56,7 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.edge.EdgeDriver;
+import org.openqa.selenium.edge.EdgeOptions;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.ie.InternetExplorerDriver;
 import org.openqa.selenium.ie.InternetExplorerOptions;
@@ -75,6 +88,17 @@ import io.appium.java_client.android.AndroidElement;
 import utility.Log;
 import utility.ScreenshotCapture;
 import utility.Highlight;
+
+
+
+
+import java.io.DataOutputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+
+
+
 
 //import org.openqa.selenium.p
 
@@ -253,6 +277,8 @@ public class ActionKeywords<IWebElement> {
 			if(data.equalsIgnoreCase("ie")){
 				System.setProperty("webdriver.ie.driver", Config.Base_Dir+"\\lib\\IEDriverServer.exe");
 				DesiredCapabilities ieCapabilities = DesiredCapabilities.internetExplorer();
+				
+				ieCapabilities.setCapability(InternetExplorerDriver.IGNORE_ZOOM_SETTING, true);
 				ieCapabilities.setCapability(InternetExplorerDriver.ENABLE_PERSISTENT_HOVERING,true);
 				ieCapabilities.setCapability(InternetExplorerDriver.REQUIRE_WINDOW_FOCUS, true);
 				ieCapabilities.setCapability("nativeEvents", false);
@@ -260,19 +286,32 @@ public class ActionKeywords<IWebElement> {
 				ieCapabilities.setCapability(InternetExplorerDriver.INTRODUCE_FLAKINESS_BY_IGNORING_SECURITY_DOMAINS,true);
 				//ieCapabilities.setJavascriptEnabled(true);
 				ieCapabilities.setCapability("ie.ensureCleanSession", true);
+				//InternetExplorerHelper.SetZoom100();
+				
+				//InternetExplorerDriver.SetZoom100();
 				ieCapabilities.setCapability(InternetExplorerDriver.INITIAL_BROWSER_URL,"https://www.google.com/");
 				driver = new InternetExplorerDriver(ieCapabilities);
 				driver.manage().deleteAllCookies();
+				//driver.findElement(By.tagName("html")).sendKeys(Keys.chord(Keys.CONTROL, "0"));
 				driver.manage().window().maximize();
+				
 				//driver.get("file///" + Config.Base_Dir+"/src/test/resources/Config/Web/openingscreen.html");
 				Log.info("IE browser started");
 			}
 			
 			if(data.equalsIgnoreCase("edge"))
 			{
-				System.setProperty("webdriver.edge.driver", Config.Base_Dir+"\\lib\\msedgedriver.exe");
-				driver = new EdgeDriver();
 				
+				
+		
+			
+				//options.AddAdditionalCapability("InPrivate", true);
+				//this.edgeDriver = new EdgeDriver(ptions)
+				//System.setProperty("webdriver.edge.driver", Config.Base_Dir+"\\lib\\msedgedriver.exe");
+				driver = new EdgeDriver();
+				driver.manage().window().maximize();
+				driver.manage().deleteAllCookies();
+//				
 				
 			}
 			
@@ -391,6 +430,7 @@ public class ActionKeywords<IWebElement> {
 			System.out.println("Value = " + DriverScript.Auto_Url);
 			if (!DriverScript.Auto_Url.equalsIgnoreCase("$Auto_Url")){
 				driver.get(DriverScript.Auto_Url);
+				ScreenshotCapture.takeScreenShot(driver);
 				Log.info("Test script URL is overidden by Octopus variable");
 				System.out.println("Test script URL is overidden by Octopus variable");
 			} else {
@@ -408,6 +448,8 @@ public class ActionKeywords<IWebElement> {
 
 	public static void clickElement(String object, String data){		
 		try{
+			
+			driver.manage().timeouts().implicitlyWait(45, TimeUnit.SECONDS);
 			Log.info("Clicking on Webelement "+ object);
 			//driver.findElement(By.xpath("Value")).click();
 			WebElement element =  objectLocator(object);
@@ -552,6 +594,8 @@ public class ActionKeywords<IWebElement> {
 	public static void enterInput(String object, String data){		
 		try{
 			
+			driver.manage().timeouts().implicitlyWait(40, TimeUnit.SECONDS);
+			
 			Log.info("Entering the text in " + object);
 			String expectedText = "";
 			if (data.trim().toLowerCase().contains("var")) {
@@ -563,6 +607,33 @@ public class ActionKeywords<IWebElement> {
 			//highLighterMethod
 			WebElement element =  objectLocator(object);
 			element.click();
+			Highlight.highlightElement(element);
+			element.sendKeys(expectedText);
+		}catch(Exception e){
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Not able to Enter UserName --- " + e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+		}
+	}
+	
+	
+	public static void enterInputnew(String object, String data){		
+		try{
+			
+			driver.manage().timeouts().implicitlyWait(40, TimeUnit.SECONDS);
+			
+			Log.info("Entering the text in " + object);
+			String expectedText = "";
+			if (data.trim().toLowerCase().contains("var")) {
+				expectedText = (String) hm.get(data);
+			} else {
+				expectedText = data;
+			}
+			System.out.print("expectedText : " + expectedText +"\n");
+			//highLighterMethod
+			WebElement element =  objectLocator(object);
+			//element.click();
 			Highlight.highlightElement(element);
 			element.sendKeys(expectedText);
 		}catch(Exception e){
@@ -660,6 +731,21 @@ public class ActionKeywords<IWebElement> {
 			Log.info("Wait for " + data + " miliseconds");
 			int userwaittime = Integer.parseInt(data);
 			Thread.sleep(userwaittime);
+			DriverScript.bResult = true;
+		
+		}catch(Exception e){
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Not able to Wait --- " + e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+		}
+	}
+	
+	public static void waitnew(String object, String data) {
+		try{
+			Log.info("Wait for " + data + " miliseconds");
+			//int userwaittime = Integer.parseInt(data);
+			Thread.sleep(3000);
 		
 		}catch(Exception e){
 			ScreenshotCapture.takeScreenShot(driver);
@@ -679,7 +765,8 @@ public class ActionKeywords<IWebElement> {
 		//	driver.get(Config.Base_Dir+"\\src\\test\\resources\\Config\\Web\\closingscreen.html");
 			Thread.sleep(1000);
 			Log.info("Closing the browser");
-			driver.quit();
+			//driver.quit();
+			driver.close();
 			DriverScript.bResult = true;
 		}catch(Exception e){
 			ScreenshotCapture.takeScreenShot(driver);
@@ -707,7 +794,11 @@ public class ActionKeywords<IWebElement> {
 	
 	public static void verifyTextPresent(String object, String data) {
 		
+		
+		
 		try {
+			
+			driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
 			
 			String expectedText = "";
 			if (data.trim().toLowerCase().contains("variable")) {
@@ -769,6 +860,8 @@ public class ActionKeywords<IWebElement> {
 
 	public static void verifyElementPresent(String object, String data){
 		try {
+			
+			driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
 			Log.info("Verify Element present " + object);
 			boolean exists = getElements(object, data).size() != 0;
 			if (exists) {
@@ -788,21 +881,105 @@ public class ActionKeywords<IWebElement> {
 		}
 	}
 	
+	public static void verifyElementenabled(String object, String data)
+	{
+		try {
+			
+			Log.info("Verify Element Enabled " + object);
+			
+			Boolean status=objectLocator(object).isEnabled();
+			 if (status==true)
+			 {
+				Highlight.highlightElement(objectLocator(object));
+				DriverScript.bResult = true;
+			 }
+			 
+			 else
+			 {
+				ScreenshotCapture.takeScreenShot(driver);
+				Log.error("Element not enabled");
+				DriverScript.bResult = false;
+				DriverScript.failedException = "Element not disabled";
+				 
+			 }
+			
+		}
+		
+		catch(Exception e)
+		{
+			
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Not able to locate element --- " + e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+			
+		}
+		
+		
+	}
+	
+	
+	public static void verifyElementDisablednew(String object, String data)
+	{
+		
+try {
+			
+			Log.info("Verify Element Disabled " + object);
+			
+			Boolean status=objectLocator(object).isEnabled();
+			 if (status==false)
+			 {
+				Highlight.highlightElement(objectLocator(object));
+				DriverScript.bResult = true;
+			 }
+			 
+			 else
+			 {
+				ScreenshotCapture.takeScreenShot(driver);
+				Log.error("Element not enabled");
+				DriverScript.bResult = false;
+				DriverScript.failedException = "Element is enabled";
+				 
+			 }
+			
+		}
+		
+		catch(Exception e)
+		{
+			
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Not able to locate element --- " + e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+			
+		}
+		
+	
+		
+		
+	}
+	
+	
+	
+	
 	public static void verifyElementDisabled(String object, String data){
 		try {
+			
+			driver.manage().timeouts().implicitlyWait(40, TimeUnit.SECONDS);
 			Log.info("Verify Element Disabled " + object);
-			String eenabled = objectLocator(object).getAttribute("readonly");
+			String eenabled = objectLocator(object).getAttribute("class");
 			
 			//Log.error(eenabled);
 			System.out.println(eenabled);
-			if (eenabled!= null) {
+			if (eenabled.contains("disable")) {
 				Highlight.highlightElement(objectLocator(object));
 				DriverScript.bResult = true;
 			} else {
 				ScreenshotCapture.takeScreenShot(driver);
-				Log.error("Element not present in the screen");
+				Highlight.highlightElement(objectLocator(object));
+				Log.error("Element not disbaled");
 				DriverScript.bResult = false;
-				DriverScript.failedException = "Element not present in the screen";
+				DriverScript.failedException = "Element not disabled";
 			}
 		} catch (Exception e) {
 			ScreenshotCapture.takeScreenShot(driver);
@@ -812,7 +989,89 @@ public class ActionKeywords<IWebElement> {
 		}
 	}
 	
+	
+	public static void verifyElementhidden(String object, String data){
+		try {
+			
+			driver.manage().timeouts().implicitlyWait(40, TimeUnit.SECONDS);
+			Log.info("Verify Element hidden " + object);
+			String hiddenelementclass = objectLocator(object).getAttribute("class");
+			
+			//Log.error(eenabled);
+			System.out.println(hiddenelementclass);
+			if (hiddenelementclass.contains("hide")) {
+				Highlight.highlightElement(objectLocator(object));
+				DriverScript.bResult = true;
+			} else {
+				ScreenshotCapture.takeScreenShot(driver);
+				Highlight.highlightElement(objectLocator(object));
+				Log.error("Element not disbaled");
+				DriverScript.bResult = false;
+				DriverScript.failedException = "Element not hidden";
+			}
+		} catch (Exception e) {
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Not able to locate element --- " + e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+		}
+	}
+	
+	public static void verifyelementnotclickable(String object, String data)     
+	{
+	    try
+	    {
+	    	
+	    	objectLocator(object).click();
+	    	Highlight.highlightElement(objectLocator(object));
+	    	ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Element is clickable");
+			DriverScript.bResult = false;
+			//DriverScript.failedException = "Element is clickbale";
+	       
+	    }
+	    catch (Exception e)
+	    {
+	  	
+	    	//Highlight.highlightElement(objectLocator(object));
+			DriverScript.bResult = true;
+			DriverScript.failedException = "Element is not clickable";
+	        
+	    }
+	}
+	    
+	    
+	    public static void verifyelementclickable(String object, String data)     
+		{
+		    try
+		    {
+		    	objectLocator(object).click();
+		    	ScreenshotCapture.takeScreenShot(driver);
+				Log.error("Element is clickbale");
+				DriverScript.bResult = true;
+				
+		       
+		    }
+		    catch (Exception e)
+		    {
+		  	
+		    	Highlight.highlightElement(objectLocator(object));
+				DriverScript.bResult = false;
+				DriverScript.failedException = "Element is not clickbale";
+		        
+		    }
+		
+	    
+//	    catch (Exception e1) {
+//			ScreenshotCapture.takeScreenShot(driver);
+//			Log.error("Not able to locate element --- " + e.getMessage());
+//			DriverScript.bResult = false;
+//			DriverScript.failedException = e.getMessage();
+//		}
+	}
+	
 	public static void verifyElementNOTPresent(String object, String data){
+		driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
 		try {
 			Log.info("Verify Element is NOT present " + object);
 			boolean exists = getElements(object, data).size() == 0;
@@ -856,6 +1115,7 @@ public class ActionKeywords<IWebElement> {
 		try{
 			Log.info("Get total row count "+ object);
 			count = driver.findElements(By.xpath(object)).size();
+			//Log.info(count);
 		}catch(Exception e){
 			ScreenshotCapture.takeScreenShot(driver);
 			Log.error("Element not present --- " + e.getMessage());
@@ -1751,7 +2011,9 @@ public class ActionKeywords<IWebElement> {
 		}
 	}
 	
-	public static void dragAndDropElement(String Fromobject, String ToObject) {         
+	public static void dragAndDropElement(String Fromobject, String ToObject) {   
+		
+		
         WebElement From = objectLocator(Fromobject);
         WebElement To = objectLocator(ToObject);
         Actions builder = new Actions(driver);
@@ -1804,8 +2066,7 @@ public class ActionKeywords<IWebElement> {
 	    }
 	 
 	 
-	 /*****************Method for New Actions for IDM***************************/
-	    /*************************@Author kcbiswal*************************/
+	
 
 	public static void getGIDSave(String object, String data) throws IOException{
 			
@@ -1908,9 +2169,9 @@ public class ActionKeywords<IWebElement> {
 	
 	
 	try{
-		WebDriverWait wait = new WebDriverWait(driver,50);
+		WebDriverWait wait = new WebDriverWait(driver,30);
 		wait.until(ExpectedConditions.visibilityOf(objectLocator(object)));
-		wait.until(ExpectedConditions.elementToBeClickable(objectLocator(object)));
+		//wait.until(ExpectedConditions.elementToBeClickable(objectLocator(object)));
 		//Highlight.highlightElement(objectLocator(object));
 		DriverScript.bResult = true;
 	}
@@ -1926,7 +2187,7 @@ public class ActionKeywords<IWebElement> {
 		
 		
 		try{
-			WebDriverWait wait = new WebDriverWait(driver,50);
+			WebDriverWait wait = new WebDriverWait(driver,30);
 			wait.until(ExpectedConditions.elementToBeClickable(objectLocator(object)));
 			//Highlight.highlightElement(objectLocator(object));
 		}
@@ -1973,8 +2234,12 @@ public class ActionKeywords<IWebElement> {
 	
 	public static void verifyobjectpresent(String object ,String data){
 		try {
+			
+		driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
 		WebElement tt =driver.findElement(By.xpath("//*[contains(text(),'" + data + "')]"));
-		tt.click();
+		//tt.click();
+		JavascriptExecutor js = (JavascriptExecutor) driver;
+		js.executeScript("arguments[0].style.border='5px solid green'", tt);
 		Highlight.highlightElement(tt);
 		
 //		if(driver.findElement(By.xpath("//*[text()='OK']")).isDisplayed())
@@ -2006,16 +2271,21 @@ public class ActionKeywords<IWebElement> {
 	public static void verifyobjectNOTpresent(String object ,String data){
 		try {
 			
-			//String exist ="//*[contains(text(),'" + data + "')]";
-			///WebElement tt =driver.findElement(By.xpath("//*[contains(text(),'" + data + "')]"));
-			//Highlight.highlightElement(tt);
+			driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
 			Log.info("Verify Element is NOT present " + data);
-			boolean exists = driver.findElement(By.xpath("//*[contains(text(),'" + data + "')]")).getSize() !=null;
 			
-			//boolean exists = getElement(tt, data).size() == 0;
+			
+			
+			boolean exists = driver.findElements(By.xpath("//*[contains(text(),'" + data + "')]")).size()==0;
+			
 			if (exists) {
+				//DriverScript.bResult = false;
 				DriverScript.bResult = true;
-			} else {
+				
+			} 
+			
+			else {
+				
 				((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView(true);", driver.findElement(By.xpath("//*[contains(text(),'" + data + "')]")));
 				Thread.sleep(500); 
 				ScreenshotCapture.takeScreenShot(driver);
@@ -2023,7 +2293,6 @@ public class ActionKeywords<IWebElement> {
 				Log.error("Element  present in the screen");
 				DriverScript.bResult = false;
 				DriverScript.failedException = "Element  present in the screen";
-				
 			
 			}
 		
@@ -2031,7 +2300,7 @@ public class ActionKeywords<IWebElement> {
 		catch(Exception e){
 			ScreenshotCapture.takeScreenShot(driver);
 			Log.error("Object Not Present--- " + e.getMessage());
-			DriverScript.bResult = false;
+			DriverScript.bResult = true;
 			DriverScript.failedException = e.getMessage();
 		}
 		
@@ -2040,87 +2309,15 @@ public class ActionKeywords<IWebElement> {
 	
 	
 	
-	public static void verifynewExternaluserdisplayed(String object,String data){
 	
-	try {
-		String tt ="//*[contains(text(),'" + data + "')]";
-		Highlight.highlightElement(driver.findElement(By.xpath(tt)));
-		String statususer=driver.findElement(By.xpath("//div[div[div[div[div[table[tbody[tr[td[span[span[contains(text(),'" + data + "')]]]]]]]]]]]/preceding-sibling::h3[1]/span")).getText();
-		//System.out.println("New Created External User Dsiplayed under" + statususer + "seaction");
-		String extusersta="Active External User";
-		//ScreenshotCapture.takeScreenShot(driver);
-				if(statususer.contentEquals(extusersta)){
-					DriverScript.bResult = true;
-					
-		}
-				else{
-					ScreenshotCapture.takeScreenShot(driver);
-					Log.error("Newly Created External User displayed under--- " + statususer);
-					DriverScript.bResult = false;
-					DriverScript.failedException = ("Newly Created External User displayed under :" + statususer);
-				}
-				
-	}
-		catch(Exception e){
-			ScreenshotCapture.takeScreenShot(driver);
-			Log.error("External User Not Present--- " + e.getMessage());
-			DriverScript.bResult = false;
-			DriverScript.failedException = e.getMessage();
-		}
-		
-		
-	}
 	
-	public static void VerifyTextfromtableandClickonresButton (String object ,String data) {
-		//try{
-		WebElement nodd = driver.findElement(By.name("F0_ctl00_ControlRef8_ControlRef15_ControlRef15_ControlRef8b_Main_Main_GridBand2_gridLoader$ctl14"));
-		Select xyz = new Select(nodd);
-		String expteamname = data.toLowerCase();
-//		WebElement results = driver.findElement(By.xpath("//*[@id='F0_ctl00_ControlRef8_ControlRef15_ControlRef15_ControlRef8b_Main_Main_GridBand2_gridLoader_pagingControl']/span[1]"));
-//		String xxxx = results.getText();
-//		String[]  aTemp= xxxx.split("//s+");
-//		String noofteam = aTemp[0];
-//		Log.info(noofteam);
-//		int result = Integer.parseInt(noofteam);
-////		if(result < 10){
-//		xyz.selectByValue("10");
-//			
-//		}
-//		else if(result > 10 && result < 20){
-//			xyz.selectByValue("20");
-//		}
-//		else if(result > 20 && result < 50){
-//			xyz.selectByValue("50");
-//		}
-//		else if(result > 50 && result < 100){
-//			xyz.selectByValue("100");
-//		}
-//		else if(result > 100 && result < 200){
-//			xyz.selectByValue("200");
-//		}
-//		else if(result > 200){
-//			xyz.selectByValue("500");
-//		}
-//		else{}
-		//Thread.sleep(1000);		
-		for(int i=0;i<=100;i++){
-		String teamname = driver.findElement(By.id("F0_ctl00_ControlRef8_ControlRef15_ControlRef15_ControlRef8b_Main_Main_GridBand2_gridLoader_R0"+i+"_R0"+i+"_0_Label1")).getText();
-		Log.info(teamname);							
-		String Actualteamname = teamname.toLowerCase();
-		//Thread.sleep(1000);
-		if(Actualteamname.contains(expteamname)){
-		driver.findElement(By.id("F0_ctl00_ControlRef8_ControlRef15_ControlRef15_ControlRef8b_Main_Main_GridBand2_gridLoader_R0"+i+"_Container4_Button3")).click();
-        break;
-				}		
-			}
-		}
 	
 	public static void howerandclickbyCord(String object, String data)
 	{
 		
 		//try {
 		//WebElement extteam = driver.findElement(By.id("F0_ctl00_ControlRef8_ControlRef15_ControlRef15_ControlRef2_ContainerTemplate2_RA_Label11"));	
-		WebElement we = objectLocator(data);
+		WebElement we = objectLocator(object);
 		Actions act = new Actions(driver);
 		Point pt = we.getLocation();
 		 
@@ -2128,7 +2325,8 @@ public class ActionKeywords<IWebElement> {
 		int NumberY=pt.getY();
 		System.out.println(NumberX);
 		System.out.println(NumberY);
-		act.moveToElement(we).build().perform();
+		//act.moveToElement(we).build().perform();
+		act.moveToElement(we).perform();
 		
 		
 //		catch(Exception e){
@@ -2232,11 +2430,4221 @@ public class ActionKeywords<IWebElement> {
 			Log.error("unable to click enter"+e.getMessage());
 		}
 	}
+	
+	
+	public static void clickusingjava(String object, String data)
+	{
+		
+		//driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+		
+		try 
+		
+		{
+			
+			WebDriverWait wait = new WebDriverWait(driver, 30);
+			WebElement element = wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(data)));
+			//element.click();
+			// WebElement element = objectLocator(object);
+			 
+		 JavascriptExecutor executor = (JavascriptExecutor)driver;
+		 executor.executeScript("arguments[0].click();", element);	
+		 
+		 DriverScript.bResult = true;
+//			
+		}
+		
+		catch(Exception e)
+		{
+			Log.error("unable to click"+e.getMessage());
+			
+			DriverScript.bResult = false;
+			
+		}
+	}
+	
+	
+	
+	public static void clickusingjavanew(String object, String data)
+	{
+		
+		
+		
+		try 
+		
+		{
+			
+			driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+			
+			//WebDriverWait wait = new WebDriverWait(driver, 30);
+			
+			WebElement element = objectLocator(object);
+			//WebElement element = wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(data)));
+	
+			 
+		 JavascriptExecutor executor = (JavascriptExecutor)driver;
+		 executor.executeScript("arguments[0].click();", element);	
+		 
+		 DriverScript.bResult = true;
+//			
+		}
+		
+		catch(Exception e)
+		{
+			Log.error("unable to click"+e.getMessage());
+			
+			DriverScript.bResult = false;
+			
+		}
+	}
+	
+	
+	
+	public static void entertextusingjava(String object, String data)
+	{
+		
+		try 
+		
+		{
+			driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+			
+			//WebDriverWait wait = new WebDriverWait(driver, 30);
+			
+			WebElement element = objectLocator(object);
+			//WebElement element = wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(data)));
+			 
+		 JavascriptExecutor executor = (JavascriptExecutor)driver;
+		 
+		 
+		 executor.executeScript("arguments[0].setAttribute('value', '" + data +"')", element);
+		 
+		 System.out.println(element.getText());
+		 
+		 
+		 DriverScript.bResult = true;
+//			
+		}
+		
+		catch(Exception e)
+		{
+			Log.error("unable to click"+e.getMessage());
+			
+			DriverScript.bResult = false;
+			
+		}
+	}
+	
+	
+	public static void handlestale(String object, String data)
+	{
+		
+		try 
+		
+		{
+			driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+			
+			WebDriverWait wait = new WebDriverWait(driver, 30);
+			
+			WebElement element = objectLocator(object);
+			
+			element.sendKeys(data);
+			 
+//		 JavascriptExecutor executor = (JavascriptExecutor)driver;
+//		 
+//		 
+//		 executor.executeScript("arguments[0].setAttribute('value', '" + data +"')", element);
+//		 
+//		 System.out.println(element.getText());
+		 
+		 
+		 DriverScript.bResult = true;
+//			
+		}
+		
+		catch(Exception e)
+		{
+			
+WebElement element = objectLocator(object);
+			
+			element.sendKeys(data);
+			Log.error("unable to get the element"+e.getMessage());
+			
+			DriverScript.bResult = false;
+			
+		}
+	}
+	
+	public static void verifyrows(String object, String data)
+	{
+		
+			
+			try{
+				int count = 0;
+				Log.info("Get total row count "+ object);
+				//count = driver.findElements(By.xpath(object)).size();
+				JavascriptExecutor js = (JavascriptExecutor) driver; 
+				
+				
+				List elements = (List) js.executeScript("return document.getElementsByTagName('tr');");
+				count=elements.size();
+				int expectedcount=Integer.parseInt(data);
+				
+				if(count==expectedcount+1)
+				{
+					DriverScript.bResult = true;	
+					Log.info("The values are matching"+"The row count displayed is"+count);
+					
+				}
+					
+				else
+				{
+					
+					ScreenshotCapture.takeScreenShot(driver);
+					Log.error("values are not matching"+"The actual count is"+count);
+					//Log.info();
+					DriverScript.bResult = false;
+		
+					
+				}
+				
+			}
+	catch(Exception e){
+				ScreenshotCapture.takeScreenShot(driver);
+				Log.error("Element not present --- " + e.getMessage());
+				DriverScript.bResult = false;
+				DriverScript.failedException = e.getMessage();
+					 
+		}
 
 	
 	
 }
 	
+	
+	public static void verfiySystemTypeRows(String object, String data){
+		int count = 0;
+		try{
+			Log.info("Get total row count "+ object);
+			count = driver.findElements(By.xpath(object)).size();
+			if(count==5)
+			{
+				Log.info("values are matching");
+				DriverScript.bResult = true;
+			}
+			else
+			{
+				Log.info("Values are not matching");
+				DriverScript.bResult = false;
+			}
+			//Log.info(count);
+		}catch(Exception e){
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Element not present --- " + e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+		}
+				 
+	}
+	
+	
+	public static void verifyuserresults(String object, String data)
+	{
+		try {
+			
+			Thread.sleep(3000);
+			
+			driver.manage().timeouts().implicitlyWait(30,TimeUnit.SECONDS);
+			
+			WebDriverWait wait = new WebDriverWait(driver, 30);
+			wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//div[@class='col-md-3 ng-binding'][1]")));
+			Thread.sleep(1000);
+	//	WebElement licenseusers = driver.findElement(By.xpath("//div[@class='col-md-3 ng-binding'][1]"));
+		
+		
+		
+		String licenseuserstext=driver.findElement(By.xpath("//div[@class='col-md-3 ng-binding'][1]")).getText();
+		String[] licenseuserstextsubstring = licenseuserstext.split("/");
+		String licenseusersnumber=licenseuserstextsubstring[1].trim();
+		
+		
+		
+		
+		Log.info(licenseuserstext);
+		Log.info(licenseuserstextsubstring[1]);
+		Log.info(licenseusersnumber+"is the license users number");
+		
+		System.out.println(licenseusersnumber+"is the license users number");
+		
+		Thread.sleep(2000);
+		
+		driver.navigate().back();
+		Thread.sleep(2000);
+		
+		wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector("#divUserManagementTab")));
+		WebElement Usermanagement = driver.findElement(By.cssSelector("#divUserManagementTab"));
+		
+		Usermanagement.click();
+		Thread.sleep(6000);
+		WebElement Usermanagementusers = driver.findElement(By.xpath("//*[@class='ng-binding'][2]"));
+		
+        String  Usermanagementuserstext =Usermanagementusers.getText();
+		
+		String Usermanagementusersnumber=Usermanagementuserstext.trim();
+		Log.info(Usermanagementuserstext);
+		Log.info(Usermanagementusersnumber+"is the user management users number");
+		
+		System.out.println(Usermanagementusersnumber+"is the user management users number");
+		
+		if(licenseusersnumber==Usermanagementusersnumber)
+		{
+			DriverScript.bResult = true;
+			Log.info("The values are matching");
+			
+		}
+		
+		else
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("The values are not matching"+"The actual value is"+Usermanagementusersnumber);
+			DriverScript.bResult = false;
+			
+		}
+		
+		
+		
+		}
+		
+		catch(Exception e)
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Element not present --- " + e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+		}
+		}
+
+	
+	
+	
+	public static void verifytheNumberofSafetyManager(String object, String data)
+	{
+		try {
+		//WebDriverWait wait = new WebDriverWait(driver, 30);
+		//wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(object)));
+		
+		List<WebElement> systemtypes=driver.findElements(By.xpath("//td[3][@class='padding15Px ng-binding defaultData' and contains(text(),'SafetyManager')]"));
+		
+		int size=systemtypes.size();
+		
+
+		int expectedcount=Integer.parseInt(data);
+		
+		if(size==expectedcount)
+		{
+			Log.info("values are matching"+size);
+			DriverScript.bResult = true;
+		}
+		
+		
+		else
+		{
+			Log.info("Values are not matching and the actual count is"+size);
+			ScreenshotCapture.takeScreenShot(driver);
+			DriverScript.bResult = false;
+		}
+		}
+		
+		
+		catch(Exception e)
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Elements not present --- " + e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+		}
+	}
+	
+	
+	public static void verifytheNumberofSafetyManagersetup(String object, String data)
+	{
+		try {
+		//WebDriverWait wait = new WebDriverWait(driver, 30);
+		//wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(object)));
+		
+		List<WebElement> systemtypes=driver.findElements(By.xpath("//td[3][@class='padding15Px ng-binding defaultData' and contains(text(),'SafetyManager')]"));
+		
+		int size=systemtypes.size();
+		
+		int actualcount = size;
+		
+		System.out.println(size+"is the actual number of safety managers");
+		
+		
+		final String POST_PARAMS = "{\n" + "\"Username\":\"icautoadmin04\",\r\n" +
+		        "    \"Password\":\"Honeywell123\",\r\n" + "\n}";
+		    System.out.println(POST_PARAMS);
+		    URL obj = new URL("https://mtswebapiic200.azurewebsites.net/api/users?clienttype=1");
+		    HttpURLConnection postConnection = (HttpURLConnection) obj.openConnection();
+		    postConnection.setRequestMethod("POST");
+		    postConnection.setRequestProperty("clienttype", "1");
+		   postConnection.setRequestProperty("Content-Type", "application/json");
+		    postConnection.setDoOutput(true);
+		    OutputStream os = postConnection.getOutputStream();
+		    os.write(POST_PARAMS.getBytes());
+		    os.flush();
+		    os.close();
+		    int responseCode = postConnection.getResponseCode();
+		    System.out.println("POST Response Code :  " + responseCode);
+		    System.out.println("POST Response Message : " + postConnection.getResponseMessage());
+		    BufferedReader in = new BufferedReader(new InputStreamReader(
+		          postConnection.getInputStream()));
+		      String inputLine;
+		      StringBuffer response = new StringBuffer();
+		      while ((inputLine = in .readLine()) != null) {
+		          response.append(inputLine);
+		      } in .close();
+		       
+		      String accesstoken =response.toString();
+		      System.out.println(response.toString());
+		      System.out.println(accesstoken);
+		      
+		      
+		      String accesstokensubstring[] = accesstoken.split(":");
+		      
+		      String acesstokensubstring2[]=accesstokensubstring[1].split(",");
+		      
+		      
+		      String actualtoken=acesstokensubstring2[0];
+		      
+		      String actualtoken1=actualtoken.substring(1, actualtoken.length()-1);
+		      
+		      System.out.println(acesstokensubstring2[0].toString()+"is the access token");
+		      
+		      System.out.println(actualtoken1+"is the new token");
+		      
+		      
+		      URL obj1 = new URL("https://mtsstoragewebapiic200.azurewebsites.net/api/setup?systemtype=2");
+		      HttpURLConnection postConnection1 = (HttpURLConnection) obj1.openConnection();
+		      postConnection1.setRequestMethod("GET");
+		      postConnection1.setRequestProperty("Authorization", "Bearer "+actualtoken1);
+		      postConnection1.setRequestProperty("Content-Type", "application/json");
+		      postConnection1.setDoOutput(true);
+		      int responseCode1 = postConnection1.getResponseCode();
+		      System.out.println("POST Response Code :  " + responseCode1);
+		      System.out.println("POST Response Message : " + postConnection1.getResponseMessage());
+		      BufferedReader in1 = new BufferedReader(new InputStreamReader(
+		            postConnection1.getInputStream()));
+		        String inputLine1;
+		        StringBuffer response1 = new StringBuffer();
+		        while ((inputLine1 = in1 .readLine()) != null) {
+		            response1.append(inputLine1);
+		        } in1 .close();
+		        
+		        
+		        System.out.println(response1.toString());
+		        
+		        Log.info(response1.toString());
+		        
+		        
+		        String responsesubstring01 = response1.toString();
+		        
+		        System.out.println(responsesubstring01);
+		        
+		        String responsesubstring02[] = responsesubstring01.split("total");
+		    
+		        System.out.println(responsesubstring02[1]);
+		        
+		        String responsesubstring03[]=responsesubstring02[1].split(":");
+		        
+		        System.out.println(responsesubstring03[1]);
+		        
+		        String responsesubstring04[]=responsesubstring03[1].split(",");
+		
+		        System.out.println(responsesubstring04[0]);
+		        
+		        int expectedcount = Integer.parseInt(responsesubstring04[0]);
+		        
+		        if (actualcount==expectedcount)
+		        {
+		        	DriverScript.bResult = true;
+		        	Log.info("The count is matching");
+		        }
+		        
+		        else
+		        {
+		        	ScreenshotCapture.takeScreenShot(driver);
+					Log.error("Count is not matching and the actual count is --- "+actualcount );
+					DriverScript.bResult = false;
+		        }
+		        
+		        
+
+		
+		}
+		
+		
+		catch(Exception e)
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Elements not present --- " + e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+		}
+	}
+	
+	public static void verifytheNumberofSafetyManagerlesson(String object, String data)
+	{
+		try {
+		//WebDriverWait wait = new WebDriverWait(driver, 30);
+		//wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(object)));
+		
+		List<WebElement> systemtypes=driver.findElements(By.xpath("//td[3][@class='padding15Px ng-binding defaultData' and contains(text(),'SafetyManager')]"));
+		
+		int size=systemtypes.size();
+		
+		int actualcount = size;
+		
+		System.out.println(size+"is the actual number of safety managers");
+		
+		
+		final String POST_PARAMS = "{\n" + "\"Username\":\"icautoadmin04\",\r\n" +
+		        "    \"Password\":\"Honeywell123\",\r\n" + "\n}";
+		    System.out.println(POST_PARAMS);
+		    URL obj = new URL("https://mtswebapiic200.azurewebsites.net/api/users?clienttype=1");
+		    HttpURLConnection postConnection = (HttpURLConnection) obj.openConnection();
+		    postConnection.setRequestMethod("POST");
+		    postConnection.setRequestProperty("clienttype", "1");
+		   postConnection.setRequestProperty("Content-Type", "application/json");
+		    postConnection.setDoOutput(true);
+		    OutputStream os = postConnection.getOutputStream();
+		    os.write(POST_PARAMS.getBytes());
+		    os.flush();
+		    os.close();
+		    int responseCode = postConnection.getResponseCode();
+		    System.out.println("POST Response Code :  " + responseCode);
+		    System.out.println("POST Response Message : " + postConnection.getResponseMessage());
+		    BufferedReader in = new BufferedReader(new InputStreamReader(
+		          postConnection.getInputStream()));
+		      String inputLine;
+		      StringBuffer response = new StringBuffer();
+		      while ((inputLine = in .readLine()) != null) {
+		          response.append(inputLine);
+		      } in .close();
+		       
+		      String accesstoken =response.toString();
+		      System.out.println(response.toString());
+		      System.out.println(accesstoken);
+		      
+		      
+		      String accesstokensubstring[] = accesstoken.split(":");
+		      
+		      String acesstokensubstring2[]=accesstokensubstring[1].split(",");
+		      
+		      
+		      String actualtoken=acesstokensubstring2[0];
+		      
+		      String actualtoken1=actualtoken.substring(1, actualtoken.length()-1);
+		      
+		      System.out.println(acesstokensubstring2[0].toString()+"is the access token");
+		      
+		      System.out.println(actualtoken1+"is the new token");
+		      
+		      
+		      URL obj1 = new URL("https://mtsstoragewebapiic200.azurewebsites.net/api/lesson?systemtype=2");
+		      HttpURLConnection postConnection1 = (HttpURLConnection) obj1.openConnection();
+		      postConnection1.setRequestMethod("GET");
+		      postConnection1.setRequestProperty("Authorization", "Bearer "+actualtoken1);
+		      postConnection1.setRequestProperty("Content-Type", "application/json");
+		      postConnection1.setDoOutput(true);
+		      int responseCode1 = postConnection1.getResponseCode();
+		      System.out.println("POST Response Code :  " + responseCode1);
+		      System.out.println("POST Response Message : " + postConnection1.getResponseMessage());
+		      BufferedReader in1 = new BufferedReader(new InputStreamReader(
+		            postConnection1.getInputStream()));
+		        String inputLine1;
+		        StringBuffer response1 = new StringBuffer();
+		        while ((inputLine1 = in1 .readLine()) != null) {
+		            response1.append(inputLine1);
+		        } in1 .close();
+		        
+		        
+		        System.out.println(response1.toString());
+		        
+		        Log.info(response1.toString());
+		        
+		        
+		        String responsesubstring01 = response1.toString();
+		        
+		        System.out.println(responsesubstring01);
+		        
+		        String responsesubstring02[] = responsesubstring01.split("total");
+		    
+		        System.out.println(responsesubstring02[1]);
+		        
+		        String responsesubstring03[]=responsesubstring02[1].split(":");
+		        
+		        System.out.println(responsesubstring03[1]);
+		        
+		        String responsesubstring04[]=responsesubstring03[1].split(",");
+		
+		        System.out.println(responsesubstring04[0]);
+		        
+		        int expectedcount = Integer.parseInt(responsesubstring04[0]);
+		        
+		        if (actualcount==expectedcount)
+		        {
+		        	DriverScript.bResult = true;
+		        	Log.info("The count is matching");
+		        }
+		        
+		        else
+		        {
+		        	ScreenshotCapture.takeScreenShot(driver);
+					Log.error("Count is not matching and the actual count is --- "+actualcount );
+					DriverScript.bResult = false;
+		        }
+		        
+		        
+
+		
+		}
+		
+		
+		catch(Exception e)
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Elements not present --- " + e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+		}
+	}
+	
+	
+	
+	
+	public static void verifytheNumberofExperion(String object, String data)
+	{
+		try {
+		//WebDriverWait wait = new WebDriverWait(driver, 30);
+		//wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(object)));
+		
+		List<WebElement> systemtypes=driver.findElements(By.xpath("//td[3][@class='padding15Px ng-binding defaultData' and contains(text(),'Experion')]"));
+		
+		int size1=systemtypes.size();
+		
+
+		int expectedcount=Integer.parseInt(data);
+		
+		
+		List<WebElement> systemtypes2=driver.findElements(By.xpath("//td[3][@class='padding15Px ng-binding' and contains(text(),'Experion')]"));
+		
+		int size2=systemtypes2.size();
+				
+		int size = size1+size2;
+		
+		if(size==expectedcount)
+		{
+			Log.info("values are matching"+size);
+			DriverScript.bResult = true;
+		}
+		
+		
+		else
+		{
+			
+			Log.info("Values are not matching and the actual count is"+size);
+			ScreenshotCapture.takeScreenShot(driver);
+			DriverScript.bResult = false;
+		}
+		}
+		
+		
+		catch(Exception e)
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Elements not present --- " + e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+		}
+	}
+	
+	
+	public static void verifythenumberofexperionlesson(String object,String data)
+	{
+		
+		
+		try {
+			//WebDriverWait wait = new WebDriverWait(driver, 30);
+			//wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(object)));
+			
+			List<WebElement> systemtypes=driver.findElements(By.xpath("//td[3][@class='padding15Px ng-binding defaultData' and contains(text(),'Experion')]"));
+			
+			
+			//td[3][@class='padding15Px ng-binding defaultData' and contains(text(),'Experion')]
+			int size=systemtypes.size();
+			
+			int actualcount = size;
+			
+			System.out.println(size+"is the actual number of experion");
+			
+			
+			final String POST_PARAMS = "{\n" + "\"Username\":\"icautoadmin04\",\r\n" +
+			        "    \"Password\":\"Honeywell123\",\r\n" + "\n}";
+			    System.out.println(POST_PARAMS);
+			    URL obj = new URL("https://mtswebapiic200.azurewebsites.net/api/users?clienttype=1");
+			    HttpURLConnection postConnection = (HttpURLConnection) obj.openConnection();
+			    postConnection.setRequestMethod("POST");
+			    postConnection.setRequestProperty("clienttype", "1");
+			   postConnection.setRequestProperty("Content-Type", "application/json");
+			    postConnection.setDoOutput(true);
+			    OutputStream os = postConnection.getOutputStream();
+			    os.write(POST_PARAMS.getBytes());
+			    os.flush();
+			    os.close();
+			    int responseCode = postConnection.getResponseCode();
+			    System.out.println("POST Response Code :  " + responseCode);
+			    System.out.println("POST Response Message : " + postConnection.getResponseMessage());
+			    BufferedReader in = new BufferedReader(new InputStreamReader(
+			          postConnection.getInputStream()));
+			      String inputLine;
+			      StringBuffer response = new StringBuffer();
+			      while ((inputLine = in .readLine()) != null) {
+			          response.append(inputLine);
+			      } in .close();
+			       
+			      String accesstoken =response.toString();
+			      System.out.println(response.toString());
+			      System.out.println(accesstoken);
+			      
+			      
+			      String accesstokensubstring[] = accesstoken.split(":");
+			      
+			      String acesstokensubstring2[]=accesstokensubstring[1].split(",");
+			      
+			      
+			      String actualtoken=acesstokensubstring2[0];
+			      
+			      String actualtoken1=actualtoken.substring(1, actualtoken.length()-1);
+			      
+			      System.out.println(acesstokensubstring2[0].toString()+"is the access token");
+			      
+			      System.out.println(actualtoken1+"is the new token");
+			      
+			      
+			      URL obj1 = new URL("https://mtsstoragewebapiic200.azurewebsites.net/api/lesson?systemtype=1");
+			      HttpURLConnection postConnection1 = (HttpURLConnection) obj1.openConnection();
+			      postConnection1.setRequestMethod("GET");
+			      postConnection1.setRequestProperty("Authorization", "Bearer "+actualtoken1);
+			      postConnection1.setRequestProperty("Content-Type", "application/json");
+			      postConnection1.setDoOutput(true);
+			      int responseCode1 = postConnection1.getResponseCode();
+			      System.out.println("POST Response Code :  " + responseCode1);
+			      System.out.println("POST Response Message : " + postConnection1.getResponseMessage());
+			      BufferedReader in1 = new BufferedReader(new InputStreamReader(
+			            postConnection1.getInputStream()));
+			        String inputLine1;
+			        StringBuffer response1 = new StringBuffer();
+			        while ((inputLine1 = in1 .readLine()) != null) {
+			            response1.append(inputLine1);
+			        } in1 .close();
+			        
+			        
+			        System.out.println(response1.toString());
+			        
+			        Log.info(response1.toString());
+			        
+			        
+			        String responsesubstring01 = response1.toString();
+			        
+			        System.out.println(responsesubstring01);
+			        
+			        String responsesubstring02[] = responsesubstring01.split("total");
+			    
+			        System.out.println(responsesubstring02[1]);
+			        
+			        String responsesubstring03[]=responsesubstring02[1].split(":");
+			        
+			        System.out.println(responsesubstring03[1]);
+			        
+			        String responsesubstring04[]=responsesubstring03[1].split(",");
+			
+			        System.out.println(responsesubstring04[0]);
+			        
+			        int expectedcount = Integer.parseInt(responsesubstring04[0]);
+			        
+			        if (actualcount==expectedcount)
+			        {
+			        	DriverScript.bResult = true;
+			        	Log.info("The count is matching");
+			        }
+			        
+			        else
+			        {
+			        	ScreenshotCapture.takeScreenShot(driver);
+						Log.error("Count is not matching and the actual count is --- "+actualcount );
+						DriverScript.bResult = false;
+			        }
+			        
+			        
+
+			
+			}
+			
+			
+			catch(Exception e)
+			{
+				ScreenshotCapture.takeScreenShot(driver);
+				Log.error("Elements not present --- " + e.getMessage());
+				DriverScript.bResult = false;
+				DriverScript.failedException = e.getMessage();
+			}
+
+		
+	}
+	
+	public static void verifythenumberofexperionsetup(String object,String data)
+	{
+		
+		
+		try {
+			//WebDriverWait wait = new WebDriverWait(driver, 30);
+			//wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.xpath(object)));
+			
+			List<WebElement> systemtypes=driver.findElements(By.xpath("//td[3][@class='padding15Px ng-binding defaultData' and contains(text(),'Experion')]"));
+			
+			
+			//td[3][@class='padding15Px ng-binding defaultData' and contains(text(),'Experion')]
+			int size=systemtypes.size();
+			
+			int actualcount = size;
+			
+			System.out.println(size+"is the actual number of experion");
+			
+			
+			final String POST_PARAMS = "{\n" + "\"Username\":\"icautoadmin04\",\r\n" +
+			        "    \"Password\":\"Honeywell123\",\r\n" + "\n}";
+			    System.out.println(POST_PARAMS);
+			    URL obj = new URL("https://mtswebapiic200.azurewebsites.net/api/users?clienttype=1");
+			    HttpURLConnection postConnection = (HttpURLConnection) obj.openConnection();
+			    postConnection.setRequestMethod("POST");
+			    postConnection.setRequestProperty("clienttype", "1");
+			   postConnection.setRequestProperty("Content-Type", "application/json");
+			    postConnection.setDoOutput(true);
+			    OutputStream os = postConnection.getOutputStream();
+			    os.write(POST_PARAMS.getBytes());
+			    os.flush();
+			    os.close();
+			    int responseCode = postConnection.getResponseCode();
+			    System.out.println("POST Response Code :  " + responseCode);
+			    System.out.println("POST Response Message : " + postConnection.getResponseMessage());
+			    BufferedReader in = new BufferedReader(new InputStreamReader(
+			          postConnection.getInputStream()));
+			      String inputLine;
+			      StringBuffer response = new StringBuffer();
+			      while ((inputLine = in .readLine()) != null) {
+			          response.append(inputLine);
+			      } in .close();
+			       
+			      String accesstoken =response.toString();
+			      System.out.println(response.toString());
+			      System.out.println(accesstoken);
+			      
+			      
+			      String accesstokensubstring[] = accesstoken.split(":");
+			      
+			      String acesstokensubstring2[]=accesstokensubstring[1].split(",");
+			      
+			      
+			      String actualtoken=acesstokensubstring2[0];
+			      
+			      String actualtoken1=actualtoken.substring(1, actualtoken.length()-1);
+			      
+			      System.out.println(acesstokensubstring2[0].toString()+"is the access token");
+			      
+			      System.out.println(actualtoken1+"is the new token");
+			      
+			      
+			      URL obj1 = new URL("https://mtsstoragewebapiic200.azurewebsites.net/api/setup?systemtype=1");
+			      HttpURLConnection postConnection1 = (HttpURLConnection) obj1.openConnection();
+			      postConnection1.setRequestMethod("GET");
+			      postConnection1.setRequestProperty("Authorization", "Bearer "+actualtoken1);
+			      postConnection1.setRequestProperty("Content-Type", "application/json");
+			      postConnection1.setDoOutput(true);
+			      int responseCode1 = postConnection1.getResponseCode();
+			      System.out.println("POST Response Code :  " + responseCode1);
+			      System.out.println("POST Response Message : " + postConnection1.getResponseMessage());
+			      BufferedReader in1 = new BufferedReader(new InputStreamReader(
+			            postConnection1.getInputStream()));
+			        String inputLine1;
+			        StringBuffer response1 = new StringBuffer();
+			        while ((inputLine1 = in1 .readLine()) != null) {
+			            response1.append(inputLine1);
+			        } in1 .close();
+			        
+			        
+			        System.out.println(response1.toString());
+			        
+			        Log.info(response1.toString());
+			        
+			        
+			        String responsesubstring01 = response1.toString();
+			        
+			        System.out.println(responsesubstring01);
+			        
+			        String responsesubstring02[] = responsesubstring01.split("total");
+			    
+			        System.out.println(responsesubstring02[1]);
+			        
+			        String responsesubstring03[]=responsesubstring02[1].split(":");
+			        
+			        System.out.println(responsesubstring03[1]);
+			        
+			        String responsesubstring04[]=responsesubstring03[1].split(",");
+			
+			        System.out.println(responsesubstring04[0]);
+			        
+			        int expectedcount = Integer.parseInt(responsesubstring04[0]);
+			        
+			        if (actualcount==expectedcount)
+			        {
+			        	DriverScript.bResult = true;
+			        	Log.info("The count is matching");
+			        }
+			        
+			        else
+			        {
+			        	ScreenshotCapture.takeScreenShot(driver);
+						Log.error("Count is not matching and the actual count is --- "+actualcount );
+						DriverScript.bResult = false;
+			        }
+			        
+			        
+
+			
+			}
+			
+			
+			catch(Exception e)
+			{
+				ScreenshotCapture.takeScreenShot(driver);
+				Log.error("Elements not present --- " + e.getMessage());
+				DriverScript.bResult = false;
+				DriverScript.failedException = e.getMessage();
+			}
+
+		
+	}
+	
+	public static void getPassword(String object, String data) throws InterruptedException
+	{
+		
+		try {
+		driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+//		try {
+			
+//			WebElement mailelement = driver.findElement(By.xpath("//span[contains(text(),'Honeywell Skills In.')]/ancestor::tr[1]"));
+//			
+//			mailelement.click();
+			List<WebElement> rows = driver.findElements(By.xpath("//span[contains(text(),'Honeywell Skills In.')]/ancestor::tr"));
+			
+			int rowsize= rows.size();
+			
+			String rowsize1= String.valueOf(rowsize);
+			
+			Log.info(rowsize1);
+			
+			int actualrows = rowsize/2;
+			
+			Log.info(actualrows+"is the actual rows");
+			rows.get(actualrows+2).click();
+//			if(rowsize==1)
+//			{
+//				rows.get(0).click();
+//			}
+//			else
+//			{
+//				rows.get(1).click();
+//			}
+//			
+			//rows.get(1).click();
+//		}
+//		
+//		catch(Exception e){
+//			
+//			Log.info("Elements not present");
+//			
+//		}
+		
+		Thread.sleep(4000);
+	
+		String text= driver.findElement(By.xpath("//label[contains(text(),'Password :')]/*")).getText();
+		
+		Log.info(text);
+		
+		System.out.println(text+"is the password");
+		Thread.sleep(4000);
+		
+		WebElement applicationlink = driver.findElement(By.xpath("//a[contains(text(),'Click here to launch the Management Console')]"));
+		
+		applicationlink.click();
+		
+		String parentWinHandle = driver.getWindowHandle();
+		
+		Set<String> windowhandles= driver.getWindowHandles();
+		
+			
+		
+		
+for(String s:windowhandles)
+	{
+	Log.info(s.toString());
+	if(!s.equals(parentWinHandle))
+	{
+		 driver.switchTo().window(s);	
+		WebDriverWait wait = new WebDriverWait(driver, 40);
+		WebElement element = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//*[@id='btnSignIn']")));
+		 
+		element.click();
+		
+		  
+		  driver.findElement(By.xpath("//input[@id='uName']")).sendKeys(data);
+
+		 driver.findElement(By.xpath("//input[@id='password']")).sendKeys(text);
+		
+	}
+
+
+	}
+
+
+DriverScript.bResult = true;
+
+		}
+		
+		
+		catch(Exception e)
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error(e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+		}
+		
+		
+		
+	}
+
+public static void navigateback(String object, String data)
+{
+	
+	
+	try {
+		
+		driver.navigate().back();
+		Thread.sleep(1000);
+		Log.info("Navigated to the previous page");
+		DriverScript.bResult = true;
+		
+		
+	}
+	
+	
+		catch(Exception e)
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.error("Unable to navigate back " + e.getMessage());
+			DriverScript.bResult = false;
+			DriverScript.failedException = e.getMessage();
+		}
+		
+
+}
+
+
+public static void  verifytoastmessage(String object, String data)
+{
+	driver.manage().timeouts().implicitlyWait(60, TimeUnit.SECONDS);
+	try {
+	
+	
+	JavascriptExecutor js = (JavascriptExecutor) driver;
+	
+	//String theTextIWant = js.executeScript("return arguments[0].innerHTML;",driver.findElement(By.xpath("//span[@itemprop='telephone']")));
+	
+	WebDriverWait wait = new WebDriverWait(driver, 30);
+	WebElement el = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath(object)));
+	
+	String text=el.getText();
+	
+	Log.info(text+"Actual text");
+	Log.info(data+"Expected text");
+	
+	if(text.contains(data))
+	{
+		js.executeScript("arguments[0].style.border='5px solid green'", el);
+		Log.info("Text is matching");
+		DriverScript.bResult = true;
+	}
+	
+	else
+	{
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.info("Text is not matching");
+		DriverScript.bResult = false;
+		
+	}
+	
+	}
+	
+	catch(Exception e){
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.error("Object Not Present--- " + e.getMessage());
+		DriverScript.bResult = false;
+		DriverScript.failedException = e.getMessage();
+	}
+	
+	
+}
+
+
+
+	
+
+//WebDriverWait wait = new WebDriverWait(driver, 20);
+//
+//WebElement element = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//*[@id='btnSignIn']")));
+//
+//element.click();
+
+//driver.findElement(By.xpath("//*[@id='btnSignIn']")).click();
+
+public static void gethiddentext(String object, String data) {
+	
+	
+	
+	
+	WebElement message =driver.findElement(By.xpath("//div[@class='alert alert-danger fade in divSuccessNotify ng-binding ng-hide']"));
+	
+	String message1=message.getAttribute("innerHTML");
+	
+	String messagenew =message.getAttribute("innerText");
+	String message5=message.getAttribute("value");
+	
+	String errormsg= message.getText();
+	
+	
+	//WebElement message1 =driver.findElement(By.xpath("//div[@ng-show='showErrorMessage']//*[1]"));
+	
+	WebElement message2 =driver.findElement(By.xpath("//div[@ng-show='showErrorMessage']//*[2]"));
+	
+	//WebElement message3 =driver.findElement(By.xpath("//div[@ng-show='showErrorMessage']//*[3]"));
+	
+	//WebElement message5 =driver.findElement(By.xpath("//div[@ng-show='showErrorMessage']//*[3]"));
+	
+	//String messageText = ((JavascriptExecutor) driver).executeScript("return arguments[0].innerHTML", message);
+	JavascriptExecutor js = (JavascriptExecutor)driver;
+	
+	String messageText =(String) js.executeScript("return arguments[0].innerHTML", message);
+	
+	String messageText1 =(String) js.executeScript("return arguments[0].innerHTML", message1);
+	String messageText2 =(String) js.executeScript("return arguments[0].innerHTML", message2);
+	
+	//String messageText3 =(String) js.executeScript("return arguments[0].innerHTML", message3);
+	//String n=(String) js.executeScript("return document.getElementsByClassName('alert alert-danger fade in divSuccessNotify ng-binding ng-hide').value;");
+	System.out.println(messageText);
+	Log.info(messageText);
+	
+	System.out.println(messageText1);
+	Log.info(messageText1);
+	
+
+	System.out.println(messageText2);
+	Log.info(messageText2);
+	
+//	System.out.println(messageText3);
+//	Log.info(messageText3);
+	
+
+	System.out.println(errormsg);
+	Log.info(errormsg);
+	
+	System.out.println(messagenew+"1");
+	Log.info(messagenew);
+	
+	
+	System.out.println(message1+"2");
+	Log.info(message1);
+	System.out.println(message5+"3");
+	Log.info(message5);
+	
+	
+}
+
+public static void getchild(String object, String data)
+{
+	
+	
+	driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+	List<WebElement> childelements = driver.findElements(By.xpath("//div[@class='alert alert-danger fade in divSuccessNotify ng-binding ng-hide']//*"));
+	
+	
+JavascriptExecutor js = (JavascriptExecutor)driver;
+	
+	String messageText =(String) js.executeScript("return arguments[0].outerHTML", childelements);
+	
+	Log.info(messageText);
+	
+	
+	for(WebElement a:childelements)
+	{
+		String text = a.getText();
+		Log.info(text);
+	}
+	
+	for(WebElement a:childelements)
+	{
+		String text = a.getAttribute("innerHTML");
+		Log.info(text+"innerHTML");
+	}
+}
+
+
+public static void resizebrowser(String object, String data)
+{
+	
+	try {
+	  Dimension d = new Dimension(800,480);
+	  driver.manage().window().setSize(d);
+	  DriverScript.bResult = true;
+	  
+	}
+	
+	catch(Exception e)
+	{
+		
+		Log.error("Unable to resize browser--- " + e.getMessage());
+		DriverScript.bResult = false;
+		DriverScript.failedException = e.getMessage();
+		
+	}
+}
+
+
+
+public static void zoomout(String object, String data)
+{
+	try {
+		
+		
+		Robot robot = new Robot();
+		
+		for(int i=0;i<3;i++)
+		{
+		
+		robot.keyPress(KeyEvent.VK_CONTROL);
+		 robot.keyPress(KeyEvent.VK_SUBTRACT);
+		 robot.keyRelease(KeyEvent.VK_SUBTRACT);
+		 robot.keyRelease(KeyEvent.VK_CONTROL);
+		 
+		}
+	} catch (AWTException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+	}
+	
+}
+
+
+public static void waituntilclickable(String object, String data) 
+{
+	
+	try {
+   driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+	
+	JavascriptExecutor js = (JavascriptExecutor) driver;
+	
+	//String theTextIWant = js.executeScript("return arguments[0].innerHTML;",driver.findElement(By.xpath("//span[@itemprop='telephone']")));
+	
+	WebDriverWait wait = new WebDriverWait(driver, 30);
+	WebElement el = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath(data)));
+	js.executeScript("arguments[0].style.border='3px dotted blue'", el);
+	}
+	
+	catch(Exception e){
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.error("Object Not Present--- " + e.getMessage());
+		DriverScript.bResult = false;
+		DriverScript.failedException = e.getMessage();
+	
+	
+	
+}
+	
+}
+
+
+public static void getOtp(String object, String data) throws InterruptedException
+{
+	//driver.navigate().to("https://accounts.google.com/ServiceLogin/signinchooser?continue=https%3A%2F%2Fmail.google.com%2Fmail%2F&service=mail&flowName=GlifWebSignIn&flowEntry=ServiceLogin");
+	driver.manage().timeouts().implicitlyWait(60, TimeUnit.SECONDS);
+	try {
+		WebDriverWait wait = new WebDriverWait(driver, 45);
+		Robot robot = new Robot();                          
+		robot.keyPress(KeyEvent.VK_CONTROL); 
+		robot.keyPress(KeyEvent.VK_T); 
+		robot.keyRelease(KeyEvent.VK_CONTROL); 
+		robot.keyRelease(KeyEvent.VK_T);
+		
+		Thread.sleep(3000);
+		String parentWinHandle = driver.getWindowHandle();
+		Set<String> windowhandles= driver.getWindowHandles();
+		
+	for(String s:windowhandles)
+	{
+	Log.info(s.toString());
+	if(!s.equals(parentWinHandle))
+	{
+		//driver.switchTo().window(s);
+	
+		ArrayList<String> tabs = new ArrayList<String> (driver.getWindowHandles());
+		driver.switchTo().window(tabs.get(1));
+		driver.navigate().to("https://accounts.google.com/ServiceLogin/signinchooser?continue=https%3A%2F%2Fmail.google.com%2Fmail%2F&service=mail&flowName=GlifWebSignIn&flowEntry=ServiceLogin");
+		WebElement username = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//input[@type='email']")));
+		username.click();
+		username.sendKeys(object);
+		WebElement Nextbtn_xpath = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//span[contains(text(),'Next')]")));
+		Nextbtn_xpath.click();
+
+		WebElement password_xpath = wait.until(ExpectedConditions.elementToBeClickable(By.xpath("//input[@type='password']")));
+		try {
+		//password_xpath.click();
+		password_xpath.sendKeys(data);
+		}
+		catch(Exception e)
+		{
+			Log.info(e.getMessage());
+			DriverScript.bResult = false;
+		}
+		try {
+			password_xpath.sendKeys(Keys.ENTER);
+		//Nextbtn_xpath.click();
+	}
+	catch(Exception e)
+	{
+		Log.info(e.getMessage());
+		DriverScript.bResult = false;
+	}
+		WebElement el = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//span[contains(text(),'Honeywell Skills In.')]/ancestor::tr")));
+		
+		
+		List<WebElement> rows = driver.findElements(By.xpath("//span[contains(text(),'Honeywell Skills In.')]/ancestor::tr"));
+		
+		int rowsize= rows.size();
+		
+		String rowsize1= String.valueOf(rowsize);
+		
+		Log.info(rowsize1+"is the number of elements matching the criteria");
+		
+		int actualsize = rowsize/2;
+		
+		Log.info(String.valueOf(actualsize+"is the actual size"));
+		
+		//int actualelement=actualsize+1;
+		
+		rows.get(0).click();
+		
+		
+		Thread.sleep(4000);
+		
+		
+		List<WebElement> OTPS = driver.findElements(By.xpath("//label[contains(text(),'OTP:')]"));
+		int OTPnumber= OTPS.size();
+		String text =OTPS.get(OTPnumber-1).getText();
+		String text1[]=text.split(":", 0);
+		String OTP = text1[1].trim();
+		
+		Log.info(text);
+		Thread.sleep(4000);
+		Log.info(text1[0]);
+		Log.info(text1[1]);
+		
+		
+		
+		String parentWinHandle1 = driver.getWindowHandle();
+		
+		Set<String> windowhandles1= driver.getWindowHandles();
+		
+		
+		
+		
+	for(String s1:windowhandles1)
+	{
+	Log.info(s1.toString());
+	if(!s1.equals(parentWinHandle1))
+	{
+		 driver.switchTo().window(s1);	
+	  
+	 Thread.sleep(3000);
+	 
+	 driver.findElement(By.xpath("//input[@name='inputOTP']")).sendKeys(OTP);
+
+
+	}
+
+	}
+		
+	}
+	}
+	}
+	
+	catch(Exception e){
+		
+		Log.info("Elements not present");
+		DriverScript.bResult = false;
+		
+	}
+	
+	
+}
+
+
+public static void scrollintoelement(String object, String data)
+{
+	try
+	{
+	WebElement element =  objectLocator(object);
+	 JavascriptExecutor js = (JavascriptExecutor) driver;
+	//webElement = driver.findElement(By.xpath("bla-bla-bla"));
+	 js.executeScript("arguments[0].scrollIntoView();", element);
+	 DriverScript.bResult = true;
+}
+	
+catch(Exception e){
+		
+		Log.info(e.getMessage());
+		DriverScript.bResult = false;
+		
+	}
+	
+
+
+	//((JavascriptExecutor)driver).executeScript("arguments[0].scrollIntoView();", element);
+}
+
+public static void scrolltobottom(String object, String data)
+{
+	try
+	{
+	JavascriptExecutor js = ((JavascriptExecutor) driver);
+	js.executeScript("window.scrollTo(0, document.body.scrollHeight)");
+	DriverScript.bResult = true;
+}
+	
+	catch(Exception e)
+	{
+		Log.info(e.getMessage());
+		DriverScript.bResult = false;
+		
+	}
+
+
+
+}
+
+public static void pagedown(String object, String data) throws AWTException
+{
+	
+	try
+	{
+	Robot robot = new Robot();
+	robot.keyPress(KeyEvent.VK_PAGE_DOWN);
+	robot.keyRelease(KeyEvent.VK_PAGE_DOWN);
+	DriverScript.bResult = true;
+	}
+	
+	catch(Exception e)
+	{
+		Log.info(e.getMessage());
+		DriverScript.bResult = false;
+		
+	}
+
+}
+
+public static void selectlesson(String object, String data) throws InterruptedException
+{
+	
+	try {
+//	WebElement element = driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/preceding-sibling::td/*"));
+	WebDriverWait wait = new WebDriverWait(driver, 45);
+	WebElement element = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//td[contains(text(),'"+data+"')]/../td[1]/input")));
+	
+	//WebElement element = driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/../td[1]/input"));
+	
+	//td[contains(text(),'L03_Faulty C300 controller Module replacement (non-redundant) with same firmware')]/../td[1]/input
+	 JavascriptExecutor js = (JavascriptExecutor) driver;
+	// js.executeScript("arguments[0].scrollIntoView();", element);
+	 js.executeScript("arguments[0].style.border='3px dotted blue'", element);
+	 
+
+	 js.executeScript("arguments[0].click();", element );
+	 Thread.sleep(3000);
+	 DriverScript.bResult = true;
+	}
+	
+	catch(Exception e)
+	{
+		Log.info(e.getMessage());
+		DriverScript.bResult = false;
+		
+	}
+	 
+}
+
+public static void selectsetup(String object, String data) throws InterruptedException
+{
+	try {
+//	WebElement element = driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/preceding-sibling::td/*"));
+	WebDriverWait wait = new WebDriverWait(driver, 45);
+	WebElement element = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//td[contains(text(),'"+data+"')]/../td[1]/input")));
+	
+	//WebElement element = driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/../td[1]/input"));
+	
+	//td[contains(text(),'L03_Faulty C300 controller Module replacement (non-redundant) with same firmware')]/../td[1]/input
+	 JavascriptExecutor js = (JavascriptExecutor) driver;
+	
+	 js.executeScript("arguments[0].style.border='3px dotted blue'", element);
+	 
+
+	 js.executeScript("arguments[0].click();", element );
+	 Thread.sleep(3000);
+	 DriverScript.bResult = true;
+	 
+	}
+	
+	catch(Exception e)
+	{
+		Log.info(e.getMessage());
+		DriverScript.bResult = false;
+		
+	}
+
+	
+}
+
+
+public static void fileupload(String object, String data ) throws AWTException, InterruptedException
+{
+	
+	try {
+	//Store the location of the file in clipboard 
+			//Clipboard
+	//C:\\Users\\Mohammed\\Desktop\\IC Test data\\Test lesson001Tue Jul 16 2019 11_37_39 GMT+0530 (India Standard Time).zip
+			StringSelection strSel = new StringSelection(data);
+			Toolkit.getDefaultToolkit().getSystemClipboard().setContents(strSel, null);
+			
+			Robot robot = new Robot();
+			//Control key in the keyboard
+			//Ctrl+V 
+//			robot.keyPress(KeyEvent.VK_CONTROL);
+//			robot.keyPress(KeyEvent.VK_V);
+//			robot.keyRelease(KeyEvent.VK_CONTROL);
+//			
+//			Thread.sleep(3000);
+//			robot.keyPress(KeyEvent.VK_ENTER);
+//			robot.keyRelease(KeyEvent.VK_ENTER);
+			
+			
+			
+			//Thread.sleep(1000);
+		      
+			  // Press Enter
+			 robot.keyPress(KeyEvent.VK_ENTER);
+			 
+			// Release Enter
+			 robot.keyRelease(KeyEvent.VK_ENTER);
+			 
+			  // Press CTRL+V
+			 robot.keyPress(KeyEvent.VK_CONTROL);
+			 robot.keyPress(KeyEvent.VK_V);
+			 
+			// Release CTRL+V
+			 robot.keyRelease(KeyEvent.VK_CONTROL);
+			 robot.keyRelease(KeyEvent.VK_V);
+			// Thread.sleep(1000);
+			        
+			        // Press Enter 
+			 robot.keyPress(KeyEvent.VK_ENTER);
+			 robot.keyRelease(KeyEvent.VK_ENTER);
+			
+			Thread.sleep(3000);
+			
+			DriverScript.bResult = true;
+			
+	}
+	
+	
+	catch(Exception e)
+	{
+		Log.info(e.getMessage());
+		DriverScript.bResult = false;
+		
+	}
+}
+
+public static void verfiylessonuploaded (String object, String data) throws InterruptedException
+{
+	try {
+	WebDriverWait wait = new WebDriverWait(driver, 45);
+	
+	//tHIS is verifying the lesson title column
+	WebElement element = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//td[contains(text(),'"+data+"')]")));
+	
+	//WebElement element = driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/../td[1]/input"));
+	
+	//td[contains(text(),'L03_Faulty C300 controller Module replacement (non-redundant) with same firmware')]/../td[1]/input
+	 JavascriptExecutor js = (JavascriptExecutor) driver;
+	 js.executeScript("arguments[0].scrollIntoView();", element);
+	 Thread.sleep(2000);
+	 js.executeScript("arguments[0].style.border='3px dotted blue'", element);
+	 
+	 WebElement systemtype= driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/../td[3]"));
+	 js.executeScript("arguments[0].style.border='3px dotted blue'", systemtype);
+	 if(systemtype.getText().contains("Experion"))
+	 {
+		 DriverScript.bResult = true;
+		 Log.info("System type is experion");
+		 
+	 }
+	 
+	 else
+	 {
+		 Log.info("System type is not experion and the actual type is"+ systemtype.getText());
+		 DriverScript.bResult = false;
+		 
+	 }
+	 
+	 WebElement status= driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/../td[5]"));
+	 js.executeScript("arguments[0].style.border='3px dotted blue'", status);
+	 
+	 if(status.getText().contains("Unpublished"))
+	 {
+		 DriverScript.bResult = true;
+		 Log.info("Status is unpublished");
+		 
+	 }
+	 
+	 else
+	 {
+		 Log.info("Status  is not correct and the actual status is"+ status.getText());
+		 DriverScript.bResult = false;
+		 
+	 }
+	 
+	 DriverScript.bResult = true;
+	}
+	
+	catch(Exception e)
+	{
+		DriverScript.bResult = false;
+		
+	}
+	 
+	 
+	
+}
+
+
+
+public static void verfiysetupuploaded (String object, String data) throws InterruptedException
+{
+	try {
+	WebDriverWait wait = new WebDriverWait(driver, 45);
+	
+	//tHIS is verifying the lesson title column
+	WebElement element = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//td[contains(text(),'"+data+"')]")));
+	
+	//WebElement element = driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/../td[1]/input"));
+	
+	//td[contains(text(),'L03_Faulty C300 controller Module replacement (non-redundant) with same firmware')]/../td[1]/input
+	 JavascriptExecutor js = (JavascriptExecutor) driver;
+	 js.executeScript("arguments[0].scrollIntoView();", element);
+	 Thread.sleep(2000);
+	 js.executeScript("arguments[0].style.border='3px dotted blue'", element);
+	 
+	 WebElement systemtype= driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/../td[3]"));
+	 js.executeScript("arguments[0].style.border='3px dotted blue'", systemtype);
+	 if(systemtype.getText().contains("Experion"))
+	 {
+		 DriverScript.bResult = true;
+		 Log.info("System type is experion");
+		 
+	 }
+	 
+	 else
+	 {
+		 Log.info("System type is not experion and the actual type is"+ systemtype.getText());
+		 DriverScript.bResult = false;
+		 
+	 }
+	 
+	 WebElement status= driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/../td[5]"));
+	 js.executeScript("arguments[0].style.border='3px dotted blue'", status);
+	 
+	 if(status.getText().contains("Unpublished"))
+	 {
+		 DriverScript.bResult = true;
+		 Log.info("Status is unpublished");
+		 
+	 }
+	 
+	 else
+	 {
+		 Log.info("Status  is not correct and the actual status is"+ status.getText());
+		 DriverScript.bResult = false;
+		 
+	 }
+	 
+	 DriverScript.bResult = true;
+	}
+	
+	catch(Exception e)
+	{
+		DriverScript.bResult = false;
+		
+	}
+	 
+	 
+	
+}
+
+
+public static void offtraineraction(String object, String data)
+{
+	
+	driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+	
+	try {
+		
+		driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+	List<WebElement> actionnames= driver.findElements(By.xpath("//*[@ng-repeat='action in actionNames']"));
+	
+	//List<WebElement> traineractions= driver.findElements(By.xpath("//*[@ng-repeat='action in trainerActions']"));
+	
+	int i;
+	for (i=0;i<actionnames.size();i++)
+	{
+		String actiontext= actionnames.get(i).getText();
+		
+		Log.info(actiontext);
+		if(actiontext.contains(data))
+		{
+		Log.info("Text is matching");
+		
+		
+			//*[@ng-repeat='action in trainerActions'][4]/*/*
+		
+		int b = i+1;
+		
+
+		
+		//*[@ng-repeat='action in trainerActions'][4]/*/div[@class='toggle btn btn-primary']/* if on the class will be toggle btn btn-primary
+		
+		
+		//if off class = toggle btn btn-default off
+		try {
+			
+			driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+			WebElement traineractions= driver.findElement(By.xpath("//*[@ng-repeat='action in trainerActions']["+b+"]/*/div[@class='toggle btn btn-primary']/*"));
+			
+			System.out.println(i);
+			
+			Highlight.highlightElement(traineractions);
+			
+			JavascriptExecutor executor = (JavascriptExecutor)driver;
+			executor.executeScript("arguments[0].click();", traineractions);
+		//	traineractions.click();
+			DriverScript.bResult = true;	
+			
+		}
+		
+		catch(Exception e)
+		{
+			Log.info("Switch is already off");
+			
+			DriverScript.bResult = false;
+		}
+			
+		}
+		
+		else
+		{
+			Log.info("There is no permission with the given text");
+			System.out.println("There is no permission with the given text");
+			//DriverScript.bResult = false;
+			
+		}
+		
+		
+	}
+	
+	}
+	
+	
+	catch(Exception e)
+	{
+		Log.info(e.getMessage());
+		
+		DriverScript.bResult = false;
+	}
+	
+	
+	
+	
+	
+	
+}
+
+
+public static void ontraineraction(String object, String data)
+{
+	driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+	
+	try {
+		
+		driver.manage().timeouts().implicitlyWait(15, TimeUnit.SECONDS);
+	List<WebElement> actionnames= driver.findElements(By.xpath("//*[@ng-repeat='action in actionNames']"));	
+	int i;
+	for (i=0;i<actionnames.size();i++)
+	{
+		String actiontext= actionnames.get(i).getText();
+		
+		Log.info(actiontext);
+		if(actiontext.contains(data))
+		{
+		Log.info("Text is matching");
+		
+		
+			//*[@ng-repeat='action in trainerActions'][4]/*/*
+		
+		int b = i+1;
+		
+
+		
+		//*[@ng-repeat='action in trainerActions'][4]/*/div[@class='toggle btn btn-primary']/* if on the class will be toggle btn btn-primary
+		
+		
+		//if off class = toggle btn btn-default off
+		try {
+			WebElement traineractions= driver.findElement(By.xpath("//*[@ng-repeat='action in trainerActions']["+b+"]/*/div[@class='toggle btn btn-default off']/*"));
+			
+			System.out.println(i);
+			
+			Highlight.highlightElement(traineractions);
+			
+			JavascriptExecutor executor = (JavascriptExecutor)driver;
+			executor.executeScript("arguments[0].click();", traineractions);
+		//	traineractions.click();
+			DriverScript.bResult = true;	
+			
+		}
+		
+		catch(Exception e)
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.info("Switch is already on");
+			
+			DriverScript.bResult = false;
+		}
+			
+		}
+		
+		else
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.info("There is no permission with the given text");
+			System.out.println("There is no permission with the given text");
+			//DriverScript.bResult = false;
+			
+		}
+		
+		
+	}
+	
+	}
+	
+	
+	catch(Exception e)
+	{
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.info(e.getMessage());
+		
+		DriverScript.bResult = false;
+	}
+	
+	
+	
+	
+	
+	
+}
+
+
+
+
+
+
+public static void POSTRequest(String object, String data) throws IOException {
+	
+	
+	try {
+	
+	driver.manage().timeouts().implicitlyWait(40, TimeUnit.SECONDS);
+	
+	WebElement totallessons = driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/following-sibling::td[3]"));
+	
+	WebElement completelessons = driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/following-sibling::td[4]"));
+	
+	WebElement incompletelessons = driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/following-sibling::td[5]"));
+	
+	
+	WebElement notstartedlessons = driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/following-sibling::td[6]"));
+	
+	
+	WebElement checkstatus = driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/following-sibling::td[7]/*"));
+	
+	Highlight.highlightElement(checkstatus);
+	
+	
+	String totallessonstext =totallessons.getText();
+	
+	int totallessonsnumber =Integer.parseInt(totallessonstext);
+	
+	String completelessonstext =completelessons.getText();
+	
+	int completelessonsnumber =Integer.parseInt(completelessonstext);
+	
+	String incompletelessonstext =incompletelessons.getText();
+	
+	int incompletelessonsnumber =Integer.parseInt(incompletelessonstext);
+	
+	String notstartedlessonstext =notstartedlessons.getText();
+	
+	Log.info(totallessonstext);
+	Log.info(completelessonstext);
+	Log.info(incompletelessonstext);
+	Log.info(notstartedlessonstext);
+	
+
+    final String POST_PARAMS = "{\n" + "\"Username\":\"icautoadmin01\",\r\n" +
+        "    \"Password\":\"Honeywell123\",\r\n" + "\n}";
+    System.out.println(POST_PARAMS);
+    URL obj = new URL("https://mtswebapiic200.azurewebsites.net/api/users?clienttype=1");
+    HttpURLConnection postConnection = (HttpURLConnection) obj.openConnection();
+    postConnection.setRequestMethod("POST");
+    postConnection.setRequestProperty("clienttype", "1");
+   postConnection.setRequestProperty("Content-Type", "application/json");
+    postConnection.setDoOutput(true);
+    OutputStream os = postConnection.getOutputStream();
+    os.write(POST_PARAMS.getBytes());
+    os.flush();
+    os.close();
+    int responseCode = postConnection.getResponseCode();
+    System.out.println("POST Response Code :  " + responseCode);
+    System.out.println("POST Response Message : " + postConnection.getResponseMessage());
+    BufferedReader in = new BufferedReader(new InputStreamReader(
+          postConnection.getInputStream()));
+      String inputLine;
+      StringBuffer response = new StringBuffer();
+      while ((inputLine = in .readLine()) != null) {
+          response.append(inputLine);
+      } in .close();
+       
+      String accesstoken =response.toString();
+      System.out.println(response.toString());
+      System.out.println(accesstoken);
+      
+      String accesstokensubstring[] = accesstoken.split(":");
+      
+      String acesstokensubstring2[]=accesstokensubstring[1].split(",");
+      
+      
+      String actualtoken=acesstokensubstring2[0];
+      
+      String actualtoken1=actualtoken.substring(1, actualtoken.length()-1);
+      
+      System.out.println(acesstokensubstring2[0].toString()+"is the access token");
+      
+      System.out.println(actualtoken1+"is the new token");
+      
+//      for(String s:accesstokensubstring)
+//      {
+//    	  System.out.println(s);
+//      }
+   
+      
+      URL obj1 = new URL("https://mtsadminwebapiic200.azurewebsites.net/api/lessonstatistics");
+      HttpURLConnection postConnection1 = (HttpURLConnection) obj1.openConnection();
+      postConnection1.setRequestMethod("GET");
+      postConnection1.setRequestProperty("Authorization", "Bearer "+actualtoken1);
+      postConnection1.setRequestProperty("Content-Type", "application/json");
+      postConnection1.setDoOutput(true);
+      int responseCode1 = postConnection1.getResponseCode();
+      System.out.println("POST Response Code :  " + responseCode1);
+      System.out.println("POST Response Message : " + postConnection1.getResponseMessage());
+      BufferedReader in1 = new BufferedReader(new InputStreamReader(
+            postConnection1.getInputStream()));
+        String inputLine1;
+        StringBuffer response1 = new StringBuffer();
+        while ((inputLine1 = in1 .readLine()) != null) {
+            response1.append(inputLine1);
+        } in1 .close();
+        
+        
+        System.out.println(response1.toString());
+        
+        Log.info(response1.toString());
+        
+        
+        String responsesubstring01 = response1.toString();
+        
+        String responsesubstring02[] = responsesubstring01.split(data);
+      
+        
+        //This will contain the complete, incomplete and not started status
+        System.out.println(responsesubstring02[1]+"is the string");
+        
+        
+        String completedlesson[]=responsesubstring02[1].split("complete");
+        
+        System.out.println(completedlesson[1]);
+        
+        String completedlessonnumber[]=completedlesson[1].split(",");
+        
+        for(String s:completedlessonnumber)
+        {
+        	System.out.println(s);
+        }
+        
+        String finalcompletedlessonnumber[]=completedlessonnumber[0].split(":");
+        
+        System.out.println(finalcompletedlessonnumber[1]+"is the number of completed lessons");
+        
+        int finalcompletedlesnumber =Integer.parseInt(finalcompletedlessonnumber[1]);
+        
+        if(finalcompletedlesnumber==completelessonsnumber)
+        {
+        	Log.info("The completed lessons value are matching and the values are"+completelessonsnumber);
+        	
+        	DriverScript.bResult = true;
+        }
+        
+        else
+        {
+        	Log.info("The completed lessons value are not matching and the values are"+completelessonsnumber);
+        	
+        	DriverScript.bResult = false;
+        }
+        
+        String incompletedlesson[]=responsesubstring02[1].split("incomplete");
+        
+        System.out.println(incompletedlesson[1]+"initial incomplete text");
+        
+        String incompletedlesson2[]=incompletedlesson[1].split(":");
+        
+        System.out.println(incompletedlesson2[1]+"IS THE NEXT INCOMPLETE TEXT");
+        
+        String incompletedlesson3[]=incompletedlesson2[1].split(",");
+        
+        System.out.println(incompletedlesson3[0]+"is the 3rd incomplte text");
+        
+        
+        int finalincompletedlesnumber = Integer.parseInt(incompletedlesson3[0]);
+        
+        
+        if(finalincompletedlesnumber==incompletelessonsnumber)
+        {
+        	Log.info("The incompleted lessons value are matching and the value displayed is "+incompletelessonsnumber);
+        	
+        	DriverScript.bResult = true;
+        }
+        
+        else
+        {
+        	Log.info("The incompleted lessons value are not matching and the value displayed is"+incompletelessonsnumber);
+        	
+        	DriverScript.bResult = false;
+        }
+        
+        String totallesson[]=responsesubstring02[1].split("total");
+        
+        System.out.println(totallesson[1]+"initial total text");
+        
+        
+        String totallesson2[]=totallesson[1].split(":");
+        
+        System.out.println(totallesson2[1]+"IS THE NEXT TOTAL TEXT");
+        
+        
+        String totallesson3[]=totallesson2[1].split(",");
+        
+        System.out.println(totallesson3[0]+"is the 3rd total text");
+        
+        int totallesson3number = Integer.parseInt(totallesson3[0]);
+        
+        if(totallesson3number==totallessonsnumber)
+        {
+        	Log.info("The total lessons value are matching and the value displayed is "+totallessonsnumber);
+        	
+        	DriverScript.bResult = true;
+        }
+        
+        else
+        {
+        	Log.info("The total lessons value are not matching and the value displayed is"+totallessonsnumber);
+        	
+        	DriverScript.bResult = false;
+        }
+        
+        
+        ScreenshotCapture.takeScreenShot(driver);
+        
+        
+        
+        
+	}
+	
+	catch(Exception e)
+	{
+		
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.info(e.getMessage());
+		
+		DriverScript.bResult = false;
+	}
+
+}
+
+
+public static void signinclick(String object, String data)
+{
+	
+	
+	try
+	{		
+		
+		
+		WebDriverWait wait = new WebDriverWait(driver, 20);
+	    WebElement Element = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("#btnLogin")));
+	    Element.click();
+		//Thread.sleep(3000);
+		//driver.manage().timeouts().implicitlyWait(20, TimeUnit.SECONDS);
+		
+		//WebElement element = driver.findElement(By.cssSelector("#btnLogin"));
+		//WebElement element = driver.findElement(By.xpath("//button[contains(text(),'Sign in')]"));
+		//JavascriptExecutor executor = (JavascriptExecutor)driver;
+		//executor.executeScript("arguments[0].click();", element);
+		
+		//element.click();
+		DriverScript.bResult=true;
+	}
+	
+	catch(Exception e)
+	{
+		
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.info("Element is not clickable");
+		DriverScript.bResult=false;
+	}
+}
+
+
+
+public static void verfiyduplicatelessonnotpresent (String object, String data) throws InterruptedException
+{
+	try {
+	WebDriverWait wait = new WebDriverWait(driver, 45);
+	
+	//tHIS is verifying the lesson title column
+	WebElement element = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//td[contains(text(),'"+data+"')]")));
+	
+	//WebElement element = driver.findElement(By.xpath("//td[contains(text(),'"+data+"')]/../td[1]/input"));
+	
+	//td[contains(text(),'L03_Faulty C300 controller Module replacement (non-redundant) with same firmware')]/../td[1]/input
+	 JavascriptExecutor js = (JavascriptExecutor) driver;
+	 js.executeScript("arguments[0].scrollIntoView();", element);
+	 Thread.sleep(2000);
+	 js.executeScript("arguments[0].style.border='3px dotted blue'", element);
+	 
+	List <WebElement> systemtype= driver.findElements(By.xpath("//td[contains(text(),'"+data+"')]/../td[3]"));
+	
+	int systemtypenumber = systemtype.size();
+	if (systemtypenumber==1)
+	{
+		System.out.println("the lesson is only one"+systemtypenumber);
+		DriverScript.bResult = true;	
+		
+		
+		
+		//Log.info(systemtypenumber);
+		
+	}
+	else
+	{
+		System.out.println("There are duplicate lessons"+ systemtypenumber);
+		DriverScript.bResult = false;
+		
+	
+	}
+	
+	// js.executeScript("arguments[0].style.border='3px dotted blue'", systemtype);
+
+	 
+	 
+	}
+	
+	catch(Exception e)
+	{
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.info(e.getMessage());
+		DriverScript.bResult = false;
+		
+	}
+	 
+	 
+	
+}
+
+
+public static void enterspace(String object, String data)
+{
+	try {
+	WebElement element =  objectLocator(object);
+	element.sendKeys(Keys.SPACE);
+	DriverScript.bResult = true;
+	}
+	
+	catch(Exception e)
+	{
+	
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.error("Unable to send enter key to the object --- " + e.getMessage());
+		DriverScript.bResult = false;
+		DriverScript.failedException = e.getMessage();
+		
+	}
+	
+}
+
+
+
+public static void dragandropnew(String object, String data)
+{
+	try {
+		
+		
+		//driver.switchTo().defaultContent();
+		driver.switchTo().frame(0);
+		
+		//WebElement sourceElement =  objectLocator(object);
+		
+		//Highlight.highlightElement(sourceElement);
+		
+		//WebElement targetElement = driver.findElement(By.cssSelector("#divGroupUpdateContainer"));
+	       
+	   // Highlight.highlightElement(targetElement);
+		
+		
+	    WebElement source = objectLocator(object);
+	    WebElement destination = driver.findElement(By.cssSelector("#divGroupUpdateContainer"));
+	    Highlight.highlightElement(source);
+	    
+	    Highlight.highlightElement(destination);
+		
+		//JavascriptExecutor js = (JavascriptExecutor) driver;
+//		String xto=Integer.toString(source.getLocation().x);
+//		String yto=Integer.toString(destination.getLocation().y);
+//		((JavascriptExecutor)driver).executeScript("function simulate(f,c,d,e){var b,a=null;for(b in eventMatchers)if(eventMatchers[b].test(c)){a=b;break}if(!a)return!1;document.createEvent?(b=document.createEvent(a),a=="HTMLEvents"?b.initEvent(c,!0,!0):b.initMouseEvent(c,!0,!0,document.defaultView,0,d,e,d,e,!1,!1,!1,!1,0,null),f.dispatchEvent(b)):(a=document.createEventObject(),a.detail=0,a.screenX=d,a.screenY=e,a.clientX=d,a.clientY=e,a.ctrlKey=!1,a.altKey=!1,a.shiftKey=!1,a.metaKey=!1,a.button=1,f.fireEvent("on"+c,a));return!0} var eventMatchers={HTMLEvents:/^(?:load|unload|abort|error|select|change|submit|reset|focus|blur|resize|scroll)$/,MouseEvents:/^(?:click|dblclick|mouse(?:down|up|over|move|out))$/}; " +
+//		"simulate(arguments[0],"mousedown",0,0); simulate(arguments[0],"mousemove",arguments[1],arguments[2]); simulate(arguments[0],"mouseup",arguments[1],arguments[2]); ",
+//		source,xto,yto);
+		
+		
+		
+		
+//		
+//	    JavascriptExecutor js = (JavascriptExecutor) driver;
+//	    js.executeScript("function createEvent(typeOfEvent) {\n" +"var event =document.createEvent("CustomEvent");\n" +"event.initCustomEvent(typeOfEvent,true, true, null);\n" +"event.dataTransfer = {\n" +"data: {},\n" +"setData: function (key, value) {\n" +"this.data[key] = value;\n" +"},\n" +"getData: function (key) {\n" +"return this.data[key];\n" +"}\n" +"};\n" +"return event;\n" +"}\n" +"\n" +"function dispatchEvent(element, event,transferData) {\n" +"if (transferData !== undefined) {\n" +"event.dataTransfer = transferData;\n" +"}\n" +"if (element.dispatchEvent) {\n" + "element.dispatchEvent(event);\n" +"} else if (element.fireEvent) {\n" +"element.fireEvent("on" + event.type, event);\n" +"}\n" +"}\n" +"\n" +"function simulateHTML5DragAndDrop(element, destination) {\n" +"var dragStartEvent =createEvent('dragstart');\n" +"dispatchEvent(element, dragStartEvent);\n" +"var dropEvent = createEvent('drop');\n" +"dispatchEvent(destination, dropEvent,dragStartEvent.dataTransfer);\n" +"var dragEndEvent = createEvent('dragend');\n" +"dispatchEvent(element, dragEndEvent,dropEvent.dataTransfer);\n" +"}\n" +"\n" +"var source = arguments[0];\n" +"var destination = arguments[1];\n" +"simulateHTML5DragAndDrop(source,destination);",source, destination);
+//	    Thread.sleep(1500);
+//		
+//		
+		
+		
+		
+	
+	    
+//	    
+//	    WebElement LocatorFrom = objectLocator(object);
+//	    WebElement LocatorTo = driver.findElement(By.cssSelector("#divGroupUpdateContainer"));
+//	    Highlight.highlightElement(LocatorFrom);
+//	    
+//	    Highlight.highlightElement(LocatorTo);
+//	    
+//	    String xto=Integer.toString(LocatorTo.getLocation().x);
+//	    String yto=Integer.toString(LocatorTo.getLocation().y);
+//	    ((JavascriptExecutor)driver).executeScript("function simulate(f,c,d,e){var b,a=null;for(b in eventMatchers)if(eventMatchers[b].test(c)){a=b;break}if(!a)return!1;document.createEvent?(b=document.createEvent(a),a==\"HTMLEvents\"?b.initEvent(c,!0,!0):b.initMouseEvent(c,!0,!0,document.defaultView,0,d,e,d,e,!1,!1,!1,!1,0,null),f.dispatchEvent(b)):(a=document.createEventObject(),a.detail=0,a.screenX=d,a.screenY=e,a.clientX=d,a.clientY=e,a.ctrlKey=!1,a.altKey=!1,a.shiftKey=!1,a.metaKey=!1,a.button=1,f.fireEvent(\"on\"+c,a));return!0} var eventMatchers={HTMLEvents:/^(?:load|unload|abort|error|select|change|submit|reset|focus|blur|resize|scroll)$/,MouseEvents:/^(?:click|dblclick|mouse(?:down|up|over|move|out))$/}; " +
+//	    "simulate(arguments[0],\"mousedown\",0,0); simulate(arguments[0],\"mousemove\",arguments[1],arguments[2]); simulate(arguments[0],\"mouseup\",arguments[1],arguments[2]); ",
+//	    LocatorFrom,xto,yto);
+//		
+		//sourceElement.click();
+	    
+	    
+//	    Actions builder = new Actions(driver);
+//
+//	    Action dragAndDrop = builder.clickAndHold(sourceElement)
+//	       .moveToElement(targetElement)
+//	       .release(targetElement)
+//	       .build();
+//
+//	    dragAndDrop.perform();
+	    
+	    
+	    
+//	    Actions builder = new Actions(driver);
+//	    builder.
+//	    //keyDown(Keys.CONTROL)
+//	    click(sourceElement)
+//	        .clickAndHold(sourceElement)
+//	        .dragAndDrop(sourceElement, driver.findElement(By.cssSelector("#divGroupUpdateContainer")))
+//	      .build().perform();
+//	    builder.release();
+	    
+//	    Actions builder = new Actions(driver);
+//	    
+//	    
+//	    
+//	    int xOffset1 = sourceElement.getLocation().getX();
+//	    
+//	    int yOffset1 =  sourceElement.getLocation().getY();
+//	    
+//	    System.out.println("xOffset1--->"+xOffset1+" yOffset1--->"+yOffset1);
+//	    
+//	    //Secondly, get x and y offset for to object
+//	    int xOffset = targetElement.getLocation().getX();
+//	    
+//	    int yOffset =  targetElement.getLocation().getY();
+//	    
+//	    System.out.println("xOffset--->"+xOffset+" yOffset--->"+yOffset);
+//	    
+//	    //Find the xOffset and yOffset difference to find x and y offset needed in which from object required to dragged and dropped
+//	    xOffset =(xOffset-xOffset1)+10;
+//	    yOffset=(yOffset-yOffset1)+20;
+//	    
+//	    builder.dragAndDropBy(sourceElement, xOffset,yOffset).perform();
+//	    
+//	   WebElement element = driver.findElement(By.xpath("//*[@id='divGroupUpdatePanel']//div[@id = 'divGroupUpdateContainer']"));
+////	    
+////	    Actions action = new Actions(driver);
+////	    
+////	    
+////	    action.moveToElement(sourceElement).clickAndHold().moveToElement(element).release().build().perform();
+//	 
+//	    
+//	    Actions builder= new Actions(driver);
+//	    builder.dragAndDrop(sourceElement, element).perform();
+//	    builder.build();
+//	    
+	    
+	        //.keyUp(Keys.CONTROL);
+
+	     //   Action selected = builder.build();
+
+	      //  selected.perform();
+	    
+//	    Actions builder = new Actions(driver);
+//
+//	    builder.keyDown(Keys.CONTROL)
+//	       .click(sourceElement)
+//	       .click(targetElement)
+//	       .keyUp(Keys.CONTROL);
+//
+//	    // Then get the action:
+//	    Action selectMultiple = builder.build();
+//
+//	    // And execute it:
+//	    selectMultiple.perform(); 
+	    
+	    
+	    
+//	    Actions act=new Actions(driver);					
+//
+//		//Dragged and dropped.		
+//	         act.dragAndDrop(sourceElement, targetElement).build().perform();
+	    		
+		
+		
+//      Actions builder = new Actions(driver);
+//       builder.clickAndHold(sourceElement);
+//        Action action = builder.build();
+//        action.perform();
+//
+//    //  driver.switchTo().frame(0);
+//       
+//       
+//
+//      builder.moveToElement(targetElement);
+//      builder.release(targetElement);
+//      action = builder.build();
+//       action.perform();
+		
+//		Actions action = new Actions(driver);
+//	
+//	
+//	
+//	
+//	
+//	
+//	Highlight.highlightElement(targetElement);
+//	//element.click();
+//	
+//	action.clickAndHold(sourceElement)
+//	
+//	
+//	.moveByOffset(-1, -1) // To fix issue with drag and drop in Chrome V61.0.3163.79
+//    .moveToElement(targetElement, 
+//    		targetElement.getLocation().getX()+targetElement.getSize().getWidth()/2, 
+//    		targetElement.getLocation().getY()+targetElement.getSize().getHeight()/2)
+//    .release(targetElement)
+//    .build()
+//    .perform();
+//Actions builder = new Actions(driver);
+//
+//builder.keyDown(Keys.CONTROL)
+//   .click(sourceElement)
+//   .click(targetElement)
+//   .keyUp(Keys.CONTROL);
+//
+//// Then get the action:
+//Action selectMultiple = builder.build();
+//
+//// And execute it:
+//selectMultiple.perform(); 
+	}
+	
+	catch(Exception e)
+	{
+	
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.error("Unable to send enter key to the object --- " + e.getMessage());
+		DriverScript.bResult = false;
+		DriverScript.failedException = e.getMessage();
+		
+	}
+	
+}
+
+
+public static void draganddropusingrobot(String object, String data) throws AWTException
+{
+	
+	
+	driver.switchTo().frame(0);
+	
+	WebElement sourceElement =  objectLocator(object);
+	
+	Highlight.highlightElement(sourceElement);
+	
+	WebElement targetElement = driver.findElement(By.cssSelector("#divGroupUpdateContainer"));
+       
+    Highlight.highlightElement(targetElement);
+	
+	Point coordinates1 = sourceElement.getLocation();
+	Point coordinates2 = targetElement.getLocation();  
+	Robot robot = new Robot();           
+	robot.mouseMove(coordinates1.getX(), coordinates1.getY());
+	robot.mousePress(InputEvent.BUTTON1_MASK);
+	robot.mouseMove(coordinates2.getX(), coordinates2.getY());
+	robot.mouseRelease(InputEvent.BUTTON1_MASK);
+	
+	
+	
+}
+
+
+public static void draganddropusingjavascript(String object, String data)
+{
+	
+    driver.switchTo().frame(0);
+	
+	WebElement sourceElement =  objectLocator(object);
+	
+	Highlight.highlightElement(sourceElement);
+	
+	WebElement targetElement = driver.findElement(By.cssSelector("#divGroupUpdateContainer"));
+       
+    Highlight.highlightElement(targetElement);
+    
+    
+    final String java_script =
+    		"var src=arguments[0],tgt=arguments[1];var dataTransfer={dropEffe" +
+    		                "ct:'',effectAllowed:'all',files:[],items:{},types:[],setData:fun" +
+    		                "ction(format,data){this.items[format]=data;this.types.append(for" +
+    		                "mat);},getData:function(format){return this.items[format];},clea" +
+    		                "rData:function(format){}};var emit=function(event,target){var ev" +
+    		                "t=document.createEvent('Event');evt.initEvent(event,true,false);" +
+    		                "evt.dataTransfer=dataTransfer;target.dispatchEvent(evt);};emit('" +
+    		                "dragstart',src);emit('dragenter',tgt);emit('dragover',tgt);emit(" +
+    		                "'drop',tgt);emit('dragend',src);";
+    
+    
+    JavascriptExecutor js = (JavascriptExecutor) driver;
+
+    		        js.executeScript(java_script, sourceElement, targetElement);
+    		        //Thread.sleep(2000);
+	
+}
+
+
+public static void handleframes(String object, String data)
+{
+	int size = driver.findElements(By.tagName("iframe")).size();
+	
+	
+	
+	List<WebElement> frames = driver.findElements(By.tagName("iframe"));
+	
+	for(WebElement f:frames)
+	{
+		String attribute = f.getAttribute("id");
+		System.out.println(attribute);
+	}
+	
+	driver.switchTo().frame(0);
+	
+	System.out.println("The number of frames is"+size);
+}
+
+
+
+//This is working but again it is asking to select the system type
+public static void handlesystemtypeie(String object,String data)
+{
+	try {
+	JavascriptExecutor js = (JavascriptExecutor) driver;
+	js.executeScript("return document.getElementById('machineTypeSelect').selectedIndex = '" + data + "';");
+	
+	DriverScript.bResult = true;
+	}
+	
+	catch(Exception e)
+	{
+	
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.error(e.getMessage());
+		DriverScript.bResult = false;
+		DriverScript.failedException = e.getMessage();
+		
+	}
+	
+	
+}
+
+public static void selectsystemtypeie(String object, String data)
+
+{
+	try {
+	WebElement firstElement =  objectLocator(object);
+	
+	WebElement secondelement = driver.findElement(By.xpath("//option[contains(text(),'Safety Manager')]"));
+	
+	
+	Actions action = new Actions(driver);
+    action.keyDown(Keys.CONTROL).click(firstElement).click(secondelement).build().perform();
+    
+    DriverScript.bResult = true;
+	}
+    
+    
+    catch(Exception e)
+	{
+    	
+    	ScreenshotCapture.takeScreenShot(driver);
+		Log.error(e.getMessage());
+		DriverScript.bResult = false;
+		DriverScript.failedException = e.getMessage();
+		
+	}
+}
+
+
+public static void selectSMOptionFromDropDownie(String object, String data) {
+	try {
+
+		objectLocator(object).click();
+		
+		DriverScript.bResult = true;
+
+	} 
+	
+	
+	catch (Exception e)
+	
+	{
+		
+		ScreenshotCapture.takeScreenShot(driver);
+		System.out.println("Exception in selectOptionFromDropDown:" + e);
+		
+		DriverScript.bResult = false;
+		DriverScript.failedException = e.getMessage();
+	}
+	
+}
+
+public static void selectexpOptionFromDropDownie(String object, String data)
+{
+	try {
+
+		objectLocator(object).click();
+		
+		//objectLocator(object).sendKeys(Keys.ARROW_UP);
+		
+		DriverScript.bResult = true;
+
+	} 
+	
+	catch (Exception e)
+	{
+		
+		ScreenshotCapture.takeScreenShot(driver);
+		System.out.println("Exception in selectOptionFromDropDown:" + e);
+		
+		DriverScript.bResult = false;
+		DriverScript.failedException = e.getMessage();
+	}
+	
+}
+
+
+public static void verfiyenabledlicensefeatures(String object, String data)
+{
+	try
+	{
+		driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+		WebElement feature = driver.findElement(By.xpath("//*[contains(text(),'"+data+"')]"));
+		JavascriptExecutor executor = (JavascriptExecutor)driver;
+		executor.executeScript("arguments[0].scrollIntoView();", feature);	
+		Highlight.highlightElement(feature);
+		if(feature.isDisplayed())
+		{
+			Log.info("feature is displayed");
+			WebElement enabledfeature =driver.findElement(By.xpath("//*[contains(text(),'"+data+"')]/*/*"));
+			String okenabled = enabledfeature.getAttribute("class");
+			if (okenabled.contains("ok"))
+			{
+				System.out.println(okenabled);
+				Log.info("feature is enabled");
+				DriverScript.bResult = true;
+			}
+			
+			else
+			{
+				Log.info("feature is not enabled");
+				DriverScript.bResult = false;
+			}
+		}
+		
+		
+		
+		else
+		{
+			Log.info("feature is not displayed");
+			ScreenshotCapture.takeScreenShot(driver);
+			System.out.println("feature is not displayed");
+			DriverScript.bResult = false;
+		}	
+		
+	}
+	
+	
+	catch (Exception e)
+	{
+		ScreenshotCapture.takeScreenShot(driver);
+		System.out.println("Exception in selectOptionFromDropDown:" + e);
+		DriverScript.bResult = false;
+		DriverScript.failedException = e.getMessage();
+	}
+	
+	
+}
+
+
+public static void verifySMlicenseuserinfo(String object, String data)
+{
+	
+	try {
+	final String POST_PARAMS = "{\n" + "\"Username\":\"icautoadmin04\",\r\n" +
+	        "    \"Password\":\"Honeywell123\",\r\n" + "\n}";
+	    System.out.println(POST_PARAMS);
+	    URL obj = new URL("https://mtswebapiic200.azurewebsites.net/api/users?clienttype=1");
+	    HttpURLConnection postConnection = (HttpURLConnection) obj.openConnection();
+	    postConnection.setRequestMethod("POST");
+	    postConnection.setRequestProperty("clienttype", "1");
+	   postConnection.setRequestProperty("Content-Type", "application/json");
+	    postConnection.setDoOutput(true);
+	    OutputStream os = postConnection.getOutputStream();
+	    os.write(POST_PARAMS.getBytes());
+	    os.flush();
+	    os.close();
+	    int responseCode = postConnection.getResponseCode();
+	    System.out.println("POST Response Code :  " + responseCode);
+	    System.out.println("POST Response Message : " + postConnection.getResponseMessage());
+	    BufferedReader in = new BufferedReader(new InputStreamReader(
+	          postConnection.getInputStream()));
+	      String inputLine;
+	      StringBuffer response = new StringBuffer();
+	      while ((inputLine = in .readLine()) != null) {
+	          response.append(inputLine);
+	      } in .close();
+	       
+	      String accesstoken =response.toString();
+	      System.out.println(response.toString());
+	      System.out.println(accesstoken);
+	      
+	      String accesstokensubstring[] = accesstoken.split(":");
+	      
+	      String acesstokensubstring2[]=accesstokensubstring[1].split(",");
+	      
+	      
+	      String actualtoken=acesstokensubstring2[0];
+	      
+	      String actualtoken1=actualtoken.substring(1, actualtoken.length()-1);
+	      
+	      System.out.println(acesstokensubstring2[0].toString()+"is the access token");
+	      
+	      System.out.println(actualtoken1+"is the new token");
+	      
+//	      for(String s:accesstokensubstring)
+//	      {
+//	    	  System.out.println(s);
+//	      }
+	   
+	      
+	      URL obj1 = new URL("https://mtsadminwebapiic200.azurewebsites.net/api/license/getlicenseinfo");
+	      HttpURLConnection postConnection1 = (HttpURLConnection) obj1.openConnection();
+	      postConnection1.setRequestMethod("GET");
+	      postConnection1.setRequestProperty("Authorization", "Bearer "+actualtoken1);
+	      postConnection1.setRequestProperty("Content-Type", "application/json");
+	      postConnection1.setDoOutput(true);
+	      int responseCode1 = postConnection1.getResponseCode();
+	      System.out.println("POST Response Code :  " + responseCode1);
+	      System.out.println("POST Response Message : " + postConnection1.getResponseMessage());
+	      BufferedReader in1 = new BufferedReader(new InputStreamReader(
+	            postConnection1.getInputStream()));
+	        String inputLine1;
+	        StringBuffer response1 = new StringBuffer();
+	        while ((inputLine1 = in1 .readLine()) != null) {
+	            response1.append(inputLine1);
+	        } in1 .close();
+	        
+	        
+	        System.out.println(response1.toString());
+	        
+	        Log.info(response1.toString());
+	        
+	        
+	        String responsesubstring01 = response1.toString();
+	        
+	        String responsesubstring02[] = responsesubstring01.split(":");
+	        
+	        System.out.println(responsesubstring02[1]+"is the string");
+	        
+	        String responsesubstring03[] = responsesubstring02[1].split(",");
+	        
+	        String numberofusers = responsesubstring03[0];
+	        
+	        int presentusersapi = Integer.parseInt(numberofusers);
+	        
+	        System.out.println(numberofusers+"are the number of users");
+	        
+	        System.out.println(presentusersapi+"present users from api call");
+	        
+	        
+	        String responsesubstring04[] = responsesubstring01.split("numberOfUser");
+	        System.out.println(responsesubstring04[1]+"are the allowed users");
+	        String responsesubstring05[]=responsesubstring04[1].split(":");
+	        System.out.println(responsesubstring05[1]);
+	        String responsesubstring06[]=responsesubstring05[1].split("}");
+	        System.out.println(responsesubstring06[0]);
+	        
+	        String allowedusers = responsesubstring06[0];
+	        
+	        int allowedusersapi = Integer.parseInt(allowedusers);
+	        
+	        System.out.println(allowedusers);
+	        
+	        System.out.println(allowedusersapi+"allowed users from api call");
+	        
+	        
+	        //This is for UI
+	        
+	        WebElement numberofusersui= driver.findElement(By.xpath("//*[contains(text(),'Number Of Users:')]/.."));
+	        
+	        String numberofusersuitext = numberofusersui.getText();
+	        
+	        System.out.println(numberofusersuitext+"is the user list from UI ");
+	        
+	        
+	        String responsesubstring07[] = numberofusersuitext.split(":");
+	        
+	        System.out.println(responsesubstring07[1]);
+	        
+	        String responsesubstring08[]=responsesubstring07[1].split("/");
+	        
+            System.out.println(responsesubstring08[0]);
+	        
+	        System.out.println(responsesubstring08[1]);
+	        
+           String responsesubstring09=responsesubstring08[0].trim();
+	        
+	       String responsesubstring10=responsesubstring08[1].trim();
+	        
+	        int presentuserUI =Integer.parseInt(responsesubstring09);
+	        
+	        int allowedusersUI=Integer.parseInt(responsesubstring10);
+	        
+	        System.out.println(presentuserUI);
+	        
+	        System.out.println(allowedusersUI);
+	        
+	        if (presentusersapi==presentuserUI)
+	        {
+	        	Log.info("The present users value are matching");
+	        	System.out.println("The present users value are matching");
+	        	DriverScript.bResult = true;
+	        }
+	        
+	        else
+	        {
+	        	ScreenshotCapture.takeScreenShot(driver);
+	        
+	        	Log.info("The present users value are not matching");
+	        	System.out.println("The present users value are not matching");
+	        	DriverScript.bResult = false;
+	        }
+	        
+	        if (allowedusersapi==allowedusersUI)
+	        {
+	        	
+	        	Log.info("The allowed users value are matching");
+	        	System.out.println("The allowed users value are matching");
+	        	DriverScript.bResult = true;
+	        	
+	        }
+	        
+	        else
+	        {
+	        	ScreenshotCapture.takeScreenShot(driver);
+	        
+	        	Log.info("The allowed users value are not matching");
+	        	System.out.println("The allowed users value are not matching");
+	        	DriverScript.bResult = false;
+	        }
+	        
+	        
+	        
+	  
+	        
+	}
+	        
+	        
+	        
+	        catch(Exception e)
+	    	{
+	    		
+	    		ScreenshotCapture.takeScreenShot(driver);
+	    		Log.info(e.getMessage());
+	    		
+	    		DriverScript.bResult = false;
+	    	}
+	
+	
+	
+	   
+	
+}
+
+public static void verifyIC300licenseuserinfo(String object, String data)
+{
+	
+	try {
+	final String POST_PARAMS = "{\n" + "\"Username\":\"icautoadmin02\",\r\n" +
+	        "    \"Password\":\"Honeywell123\",\r\n" + "\n}";
+	    System.out.println(POST_PARAMS);
+	    URL obj = new URL("https://mtswebapiic200.azurewebsites.net/api/users?clienttype=1");
+	    HttpURLConnection postConnection = (HttpURLConnection) obj.openConnection();
+	    postConnection.setRequestMethod("POST");
+	    postConnection.setRequestProperty("clienttype", "1");
+	   postConnection.setRequestProperty("Content-Type", "application/json");
+	    postConnection.setDoOutput(true);
+	    OutputStream os = postConnection.getOutputStream();
+	    os.write(POST_PARAMS.getBytes());
+	    os.flush();
+	    os.close();
+	    int responseCode = postConnection.getResponseCode();
+	    System.out.println("POST Response Code :  " + responseCode);
+	    System.out.println("POST Response Message : " + postConnection.getResponseMessage());
+	    BufferedReader in = new BufferedReader(new InputStreamReader(
+	          postConnection.getInputStream()));
+	      String inputLine;
+	      StringBuffer response = new StringBuffer();
+	      while ((inputLine = in .readLine()) != null) {
+	          response.append(inputLine);
+	      } in .close();
+	       
+	      String accesstoken =response.toString();
+	      System.out.println(response.toString());
+	      System.out.println(accesstoken);
+	      
+	      String accesstokensubstring[] = accesstoken.split(":");
+	      
+	      String acesstokensubstring2[]=accesstokensubstring[1].split(",");
+	      
+	      
+	      String actualtoken=acesstokensubstring2[0];
+	      
+	      String actualtoken1=actualtoken.substring(1, actualtoken.length()-1);
+	      
+	      System.out.println(acesstokensubstring2[0].toString()+"is the access token");
+	      
+	      System.out.println(actualtoken1+"is the new token");
+	      
+//	      for(String s:accesstokensubstring)
+//	      {
+//	    	  System.out.println(s);
+//	      }
+	   
+	      
+	      URL obj1 = new URL("https://mtsadminwebapiic200.azurewebsites.net/api/license/getlicenseinfo");
+	      HttpURLConnection postConnection1 = (HttpURLConnection) obj1.openConnection();
+	      postConnection1.setRequestMethod("GET");
+	      postConnection1.setRequestProperty("Authorization", "Bearer "+actualtoken1);
+	      postConnection1.setRequestProperty("Content-Type", "application/json");
+	      postConnection1.setDoOutput(true);
+	      int responseCode1 = postConnection1.getResponseCode();
+	      System.out.println("POST Response Code :  " + responseCode1);
+	      System.out.println("POST Response Message : " + postConnection1.getResponseMessage());
+	      BufferedReader in1 = new BufferedReader(new InputStreamReader(
+	            postConnection1.getInputStream()));
+	        String inputLine1;
+	        StringBuffer response1 = new StringBuffer();
+	        while ((inputLine1 = in1 .readLine()) != null) {
+	            response1.append(inputLine1);
+	        } in1 .close();
+	        
+	        
+	        System.out.println(response1.toString());
+	        
+	        Log.info(response1.toString());
+	        
+	        
+	        String responsesubstring01 = response1.toString();
+	        
+	        String responsesubstring02[] = responsesubstring01.split(":");
+	        
+	        System.out.println(responsesubstring02[1]+"is the string");
+	        
+	        String responsesubstring03[] = responsesubstring02[1].split(",");
+	        
+	        String numberofusers = responsesubstring03[0];
+	        
+	        int presentusersapi = Integer.parseInt(numberofusers);
+	        
+	        System.out.println(numberofusers+"are the number of users");
+	        
+	        System.out.println(presentusersapi+"present users from api call");
+	        
+	        
+	        String responsesubstring04[] = responsesubstring01.split("numberOfUser");
+	        System.out.println(responsesubstring04[1]+"are the allowed users");
+	        String responsesubstring05[]=responsesubstring04[1].split(":");
+	        System.out.println(responsesubstring05[1]);
+	        String responsesubstring06[]=responsesubstring05[1].split("}");
+	        System.out.println(responsesubstring06[0]);
+	        
+	        String allowedusers = responsesubstring06[0];
+	        
+	        int allowedusersapi = Integer.parseInt(allowedusers);
+	        
+	        System.out.println(allowedusers);
+	        
+	        System.out.println(allowedusersapi+"allowed users from api call");
+	        
+	        
+	        //This is for UI
+	        
+	        WebElement numberofusersui= driver.findElement(By.xpath("//*[contains(text(),'Number Of Users:')]/.."));
+	        
+	        String numberofusersuitext = numberofusersui.getText();
+	        
+	        System.out.println(numberofusersuitext+"is the user list from UI ");
+	        
+	        
+	        String responsesubstring07[] = numberofusersuitext.split(":");
+	        
+	        System.out.println(responsesubstring07[1]);
+	        
+	        String responsesubstring08[]=responsesubstring07[1].split("/");
+	        
+            System.out.println(responsesubstring08[0]);
+	        
+	        System.out.println(responsesubstring08[1]);
+	        
+           String responsesubstring09=responsesubstring08[0].trim();
+	        
+	       String responsesubstring10=responsesubstring08[1].trim();
+	        
+	        int presentuserUI =Integer.parseInt(responsesubstring09);
+	        
+	        int allowedusersUI=Integer.parseInt(responsesubstring10);
+	        
+	        System.out.println(presentuserUI);
+	        
+	        System.out.println(allowedusersUI);
+	        
+	        if (presentusersapi==presentuserUI)
+	        {
+	        	Log.info("The present users value are matching");
+	        	System.out.println("The present users value are matching");
+	        	DriverScript.bResult = true;
+	        }
+	        
+	        else
+	        {
+	        	ScreenshotCapture.takeScreenShot(driver);
+	        
+	        	Log.info("The present users value are not matching");
+	        	System.out.println("The present users value are not matching");
+	        	DriverScript.bResult = false;
+	        }
+	        
+	        if (allowedusersapi==allowedusersUI)
+	        {
+	        	
+	        	Log.info("The allowed users value are matching");
+	        	System.out.println("The allowed users value are matching");
+	        	DriverScript.bResult = true;
+	        	
+	        }
+	        
+	        else
+	        {
+	        	ScreenshotCapture.takeScreenShot(driver);
+	        
+	        	Log.info("The allowed users value are not matching");
+	        	System.out.println("The allowed users value are not matching");
+	        	DriverScript.bResult = false;
+	        }
+	        
+	        
+	        
+	  
+	        
+	}
+	        
+	        
+	        
+	        catch(Exception e)
+	    	{
+	    		
+	    		ScreenshotCapture.takeScreenShot(driver);
+	    		Log.info(e.getMessage());
+	    		
+	    		DriverScript.bResult = false;
+	    	}
+	
+	
+	
+	   
+	
+}
+
+
+
+public static void verifySMlicensehours(String object, String data)
+{
+	
+	
+		
+		
+		try {
+			final String POST_PARAMS = "{\n" + "\"Username\":\"icautoadmin04\",\r\n" +
+			        "    \"Password\":\"Honeywell123\",\r\n" + "\n}";
+			    System.out.println(POST_PARAMS);
+			    URL obj = new URL("https://mtswebapiic200.azurewebsites.net/api/users?clienttype=1");
+			    HttpURLConnection postConnection = (HttpURLConnection) obj.openConnection();
+			    postConnection.setRequestMethod("POST");
+			    postConnection.setRequestProperty("clienttype", "1");
+			   postConnection.setRequestProperty("Content-Type", "application/json");
+			    postConnection.setDoOutput(true);
+			    OutputStream os = postConnection.getOutputStream();
+			    os.write(POST_PARAMS.getBytes());
+			    os.flush();
+			    os.close();
+			    int responseCode = postConnection.getResponseCode();
+			    System.out.println("POST Response Code :  " + responseCode);
+			    System.out.println("POST Response Message : " + postConnection.getResponseMessage());
+			    BufferedReader in = new BufferedReader(new InputStreamReader(
+			          postConnection.getInputStream()));
+			      String inputLine;
+			      StringBuffer response = new StringBuffer();
+			      while ((inputLine = in .readLine()) != null) {
+			          response.append(inputLine);
+			      } in .close();
+			       
+			      String accesstoken =response.toString();
+			      System.out.println(response.toString());
+			      System.out.println(accesstoken);
+			      
+			      String accesstokensubstring[] = accesstoken.split(":");
+			      
+			      String acesstokensubstring2[]=accesstokensubstring[1].split(",");
+			      
+			      
+			      String actualtoken=acesstokensubstring2[0];
+			      
+			      String actualtoken1=actualtoken.substring(1, actualtoken.length()-1);
+			      
+			      System.out.println(acesstokensubstring2[0].toString()+"is the access token");
+			      
+			      System.out.println(actualtoken1+"is the new token");
+			      
+//			      for(String s:accesstokensubstring)
+//			      {
+//			    	  System.out.println(s);
+//			      }
+			   
+			      
+			      URL obj1 = new URL("https://mtsadminwebapiic200.azurewebsites.net/api/license/getlicenseinfo");
+			      HttpURLConnection postConnection1 = (HttpURLConnection) obj1.openConnection();
+			      postConnection1.setRequestMethod("GET");
+			      postConnection1.setRequestProperty("Authorization", "Bearer "+actualtoken1);
+			      postConnection1.setRequestProperty("Content-Type", "application/json");
+			      postConnection1.setDoOutput(true);
+			      int responseCode1 = postConnection1.getResponseCode();
+			      System.out.println("POST Response Code :  " + responseCode1);
+			      System.out.println("POST Response Message : " + postConnection1.getResponseMessage());
+			      BufferedReader in1 = new BufferedReader(new InputStreamReader(
+			            postConnection1.getInputStream()));
+			        String inputLine1;
+			        StringBuffer response1 = new StringBuffer();
+			        while ((inputLine1 = in1 .readLine()) != null) {
+			            response1.append(inputLine1);
+			        } in1 .close();
+			        
+			        
+			        System.out.println(response1.toString());
+			        
+			        Log.info(response1.toString());
+			        
+			        
+			        String responsesubstring01=response1.toString();
+			        
+			        String responsesubstring02[] = responsesubstring01.split("minutesTotal");
+			        
+			        String responsesubstring03=responsesubstring02[1];
+			        
+			        System.out.println(responsesubstring03);
+			        
+			        String responsesubstring04[]=responsesubstring03.split(":");
+			        
+			        System.out.println(responsesubstring04[1]);
+			        
+			        String responsesubstring05[]=responsesubstring04[1].split(",");
+			        
+			        System.out.println(responsesubstring05[0]);
+			        
+			        int totalminutesapi = Integer.parseInt(responsesubstring05[0]);
+			        
+			        int totalhoursapi = (totalminutesapi/60);
+			        
+			        System.out.println(totalhoursapi);
+			        
+			        String responsesubstring06[]=responsesubstring01.split("minutesRem");
+			        String responsesubstring07=responsesubstring06[1];
+			        System.out.println(responsesubstring07);
+			        String responsesubstring08[]=responsesubstring07.split(":");
+			        System.out.println(responsesubstring08[1]);
+			        String responsesubstring09[]=responsesubstring08[1].split(",");
+			        
+			        System.out.println(responsesubstring09[0]);
+			        
+                    int remainingminutesapi = Integer.parseInt(responsesubstring09[0]);
+                    
+                    int remaininghoursapi=remainingminutesapi/60;
+                    
+                    System.out.println(remaininghoursapi);
+			        
+			       // int remainhoursapi = (totalminutesapi/60);
+                    
+                    
+                    
+                    
+                    WebElement numberofhoursui= driver.findElement(By.xpath("//*[contains(text(),'Remaining Hours:')]/.."));
+        	        
+        	        String numberofhoursuitext = numberofhoursui.getText();
+        	        
+        	        System.out.println(numberofhoursuitext+"is the user list from UI ");
+        	        
+        	        
+        	        String responsesubstring10[] = numberofhoursuitext.split(":");
+        	        
+        	        System.out.println(responsesubstring10[1]);
+        	        
+        	        String responsesubstring11[]=responsesubstring10[1].split("/");
+        	        
+                    System.out.println(responsesubstring11[0]);
+        	        
+        	        System.out.println(responsesubstring11[1]);
+        	        
+                   String responsesubstring12=responsesubstring11[0].trim();
+        	        
+        	       String responsesubstring13=responsesubstring11[1].trim();
+        	        
+        	        int remaininghoursUI =Integer.parseInt(responsesubstring12);
+        	        
+        	        int totalhoursUI=Integer.parseInt(responsesubstring13);
+        	        
+        	        System.out.println(remaininghoursUI);
+        	        
+        	        System.out.println(totalhoursUI);
+        	        
+        	        if (totalhoursapi==totalhoursUI)
+        	        {
+        	        	Log.info("The total hours value is matching");
+        	        	System.out.println("The total hours value is matching");
+        	        	DriverScript.bResult = true;
+        	        }
+        	        
+        	        else
+        	        {
+        	        	ScreenshotCapture.takeScreenShot(driver);
+        	        
+        	        	Log.info("The total hours value is not matching");
+        	        	System.out.println("The total hours value is not matching");
+        	        	DriverScript.bResult = false;
+        	        }
+        	        
+        	        if (remaininghoursapi==remaininghoursUI)
+        	        {
+        	        	
+        	        	Log.info("The remainining hours value is matching");
+        	        	System.out.println("The remainining hours value is matching");
+        	        	DriverScript.bResult = true;
+        	        	
+        	        }
+        	        
+        	        else
+        	        {
+        	        	ScreenshotCapture.takeScreenShot(driver);
+   
+        	        	Log.info("The remainining hours value is not matching");
+        	        	System.out.println("The remainining hours value is not matching");
+        	        	DriverScript.bResult = false;
+        	        }
+        	        
+        	 
+			        
+			        
+			
+		
+		
+	}
+	   catch(Exception e)
+	{
+		
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.info(e.getMessage());
+		
+		DriverScript.bResult = false;
+	}
+	
+}
+
+public static void verifyIC300licensehours(String object, String data)
+{
+	
+	
+		
+		
+		try {
+			final String POST_PARAMS = "{\n" + "\"Username\":\"icautoadmin02\",\r\n" +
+			        "    \"Password\":\"Honeywell123\",\r\n" + "\n}";
+			    System.out.println(POST_PARAMS);
+			    URL obj = new URL("https://mtswebapiic200.azurewebsites.net/api/users?clienttype=1");
+			    HttpURLConnection postConnection = (HttpURLConnection) obj.openConnection();
+			    postConnection.setRequestMethod("POST");
+			    postConnection.setRequestProperty("clienttype", "1");
+			   postConnection.setRequestProperty("Content-Type", "application/json");
+			    postConnection.setDoOutput(true);
+			    OutputStream os = postConnection.getOutputStream();
+			    os.write(POST_PARAMS.getBytes());
+			    os.flush();
+			    os.close();
+			    int responseCode = postConnection.getResponseCode();
+			    System.out.println("POST Response Code :  " + responseCode);
+			    System.out.println("POST Response Message : " + postConnection.getResponseMessage());
+			    BufferedReader in = new BufferedReader(new InputStreamReader(
+			          postConnection.getInputStream()));
+			      String inputLine;
+			      StringBuffer response = new StringBuffer();
+			      while ((inputLine = in .readLine()) != null) {
+			          response.append(inputLine);
+			      } in .close();
+			       
+			      String accesstoken =response.toString();
+			      System.out.println(response.toString());
+			      System.out.println(accesstoken);
+			      
+			      String accesstokensubstring[] = accesstoken.split(":");
+			      
+			      String acesstokensubstring2[]=accesstokensubstring[1].split(",");
+			      
+			      
+			      String actualtoken=acesstokensubstring2[0];
+			      
+			      String actualtoken1=actualtoken.substring(1, actualtoken.length()-1);
+			      
+			      System.out.println(acesstokensubstring2[0].toString()+"is the access token");
+			      
+			      System.out.println(actualtoken1+"is the new token");
+			      
+//			      for(String s:accesstokensubstring)
+//			      {
+//			    	  System.out.println(s);
+//			      }
+			   
+			      
+			      URL obj1 = new URL("https://mtsadminwebapiic200.azurewebsites.net/api/license/getlicenseinfo");
+			      HttpURLConnection postConnection1 = (HttpURLConnection) obj1.openConnection();
+			      postConnection1.setRequestMethod("GET");
+			      postConnection1.setRequestProperty("Authorization", "Bearer "+actualtoken1);
+			      postConnection1.setRequestProperty("Content-Type", "application/json");
+			      postConnection1.setDoOutput(true);
+			      int responseCode1 = postConnection1.getResponseCode();
+			      System.out.println("POST Response Code :  " + responseCode1);
+			      System.out.println("POST Response Message : " + postConnection1.getResponseMessage());
+			      BufferedReader in1 = new BufferedReader(new InputStreamReader(
+			            postConnection1.getInputStream()));
+			        String inputLine1;
+			        StringBuffer response1 = new StringBuffer();
+			        while ((inputLine1 = in1 .readLine()) != null) {
+			            response1.append(inputLine1);
+			        } in1 .close();
+			        
+			        
+			        System.out.println(response1.toString());
+			        
+			        Log.info(response1.toString());
+			        
+			        
+			        String responsesubstring01=response1.toString();
+			        
+			        String responsesubstring02[] = responsesubstring01.split("minutesTotal");
+			        
+			        String responsesubstring03=responsesubstring02[1];
+			        
+			        System.out.println(responsesubstring03);
+			        
+			        String responsesubstring04[]=responsesubstring03.split(":");
+			        
+			        System.out.println(responsesubstring04[1]);
+			        
+			        String responsesubstring05[]=responsesubstring04[1].split(",");
+			        
+			        System.out.println(responsesubstring05[0]);
+			        
+			        int totalminutesapi = Integer.parseInt(responsesubstring05[0]);
+			        
+			        int totalhoursapi = (totalminutesapi/60);
+			        
+			        System.out.println(totalhoursapi);
+			        
+			        String responsesubstring06[]=responsesubstring01.split("minutesRem");
+			        String responsesubstring07=responsesubstring06[1];
+			        System.out.println(responsesubstring07);
+			        String responsesubstring08[]=responsesubstring07.split(":");
+			        System.out.println(responsesubstring08[1]);
+			        String responsesubstring09[]=responsesubstring08[1].split(",");
+			        
+			        System.out.println(responsesubstring09[0]);
+			        
+                    int remainingminutesapi = Integer.parseInt(responsesubstring09[0]);
+                    
+                    int remaininghoursapi=remainingminutesapi/60;
+                    
+                    System.out.println(remaininghoursapi);
+			        
+			       // int remainhoursapi = (totalminutesapi/60);
+                    
+                    
+                    
+                    
+                    WebElement numberofhoursui= driver.findElement(By.xpath("//*[contains(text(),'Remaining Hours:')]/.."));
+        	        
+        	        String numberofhoursuitext = numberofhoursui.getText();
+        	        
+        	        System.out.println(numberofhoursuitext+"is the user list from UI ");
+        	        
+        	        
+        	        String responsesubstring10[] = numberofhoursuitext.split(":");
+        	        
+        	        System.out.println(responsesubstring10[1]);
+        	        
+        	        String responsesubstring11[]=responsesubstring10[1].split("/");
+        	        
+                    System.out.println(responsesubstring11[0]);
+        	        
+        	        System.out.println(responsesubstring11[1]);
+        	        
+                   String responsesubstring12=responsesubstring11[0].trim();
+        	        
+        	       String responsesubstring13=responsesubstring11[1].trim();
+        	        
+        	        int remaininghoursUI =Integer.parseInt(responsesubstring12);
+        	        
+        	        int totalhoursUI=Integer.parseInt(responsesubstring13);
+        	        
+        	        System.out.println(remaininghoursUI);
+        	        
+        	        System.out.println(totalhoursUI);
+        	        
+        	        if (totalhoursapi==totalhoursUI)
+        	        {
+        	        	Log.info("The total hours value is matching");
+        	        	System.out.println("The total hours value is matching");
+        	        	DriverScript.bResult = true;
+        	        }
+        	        
+        	        else
+        	        {
+        	        	ScreenshotCapture.takeScreenShot(driver);
+        	        
+        	        	Log.info("The total hours value is not matching");
+        	        	System.out.println("The total hours value is not matching");
+        	        	DriverScript.bResult = false;
+        	        }
+        	        
+        	        if (remaininghoursapi==remaininghoursUI)
+        	        {
+        	        	
+        	        	Log.info("The remainining hours value is matching");
+        	        	System.out.println("The remainining hours value is matching");
+        	        	DriverScript.bResult = true;
+        	        	
+        	        }
+        	        
+        	        else
+        	        {
+        	        	ScreenshotCapture.takeScreenShot(driver);
+   
+        	        	Log.info("The remainining hours value is not matching");
+        	        	System.out.println("The remainining hours value is not matching");
+        	        	DriverScript.bResult = false;
+        	        }
+        	        
+        	 
+			        
+			        
+			
+		
+		
+	}
+	   catch(Exception e)
+	{
+		
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.info(e.getMessage());
+		
+		DriverScript.bResult = false;
+	}
+	
+}
+
+
+
+public static void verifySMexpirydate(String object, String data)
+{
+	
+	
+	try {
+		final String POST_PARAMS = "{\n" + "\"Username\":\"icautoadmin04\",\r\n" +
+		        "    \"Password\":\"Honeywell123\",\r\n" + "\n}";
+		    System.out.println(POST_PARAMS);
+		    URL obj = new URL("https://mtswebapiic200.azurewebsites.net/api/users?clienttype=1");
+		    HttpURLConnection postConnection = (HttpURLConnection) obj.openConnection();
+		    postConnection.setRequestMethod("POST");
+		    postConnection.setRequestProperty("clienttype", "1");
+		   postConnection.setRequestProperty("Content-Type", "application/json");
+		    postConnection.setDoOutput(true);
+		    OutputStream os = postConnection.getOutputStream();
+		    os.write(POST_PARAMS.getBytes());
+		    os.flush();
+		    os.close();
+		    int responseCode = postConnection.getResponseCode();
+		    System.out.println("POST Response Code :  " + responseCode);
+		    System.out.println("POST Response Message : " + postConnection.getResponseMessage());
+		    BufferedReader in = new BufferedReader(new InputStreamReader(
+		          postConnection.getInputStream()));
+		      String inputLine;
+		      StringBuffer response = new StringBuffer();
+		      while ((inputLine = in .readLine()) != null) {
+		          response.append(inputLine);
+		      } in .close();
+		       
+		      String accesstoken =response.toString();
+		      System.out.println(response.toString());
+		      System.out.println(accesstoken);
+		      
+		      String accesstokensubstring[] = accesstoken.split(":");
+		      
+		      String acesstokensubstring2[]=accesstokensubstring[1].split(",");
+		      		      
+		      String actualtoken=acesstokensubstring2[0];
+		      
+		      String actualtoken1=actualtoken.substring(1, actualtoken.length()-1);
+		      
+		      System.out.println(acesstokensubstring2[0].toString()+"is the access token");
+		      
+		      System.out.println(actualtoken1+"is the new token");
+		   
+		      
+		      URL obj1 = new URL("https://mtsadminwebapiic200.azurewebsites.net/api/license/getlicenseinfo");
+		      HttpURLConnection postConnection1 = (HttpURLConnection) obj1.openConnection();
+		      postConnection1.setRequestMethod("GET");
+		      postConnection1.setRequestProperty("Authorization", "Bearer "+actualtoken1);
+		      postConnection1.setRequestProperty("Content-Type", "application/json");
+		      postConnection1.setDoOutput(true);
+		      int responseCode1 = postConnection1.getResponseCode();
+		      System.out.println("POST Response Code :  " + responseCode1);
+		      System.out.println("POST Response Message : " + postConnection1.getResponseMessage());
+		      BufferedReader in1 = new BufferedReader(new InputStreamReader(
+		            postConnection1.getInputStream()));
+		        String inputLine1;
+		        StringBuffer response1 = new StringBuffer();
+		        while ((inputLine1 = in1 .readLine()) != null) {
+		            response1.append(inputLine1);
+		        } in1 .close();
+		        
+		        
+		        System.out.println(response1.toString());
+		        
+		        Log.info(response1.toString());
+		        
+		        
+		        String responsesubstring01=response1.toString();
+		        
+		        String responsesubstring02[] = responsesubstring01.split("expiryDate");
+		        
+		        String responsesubstring03=responsesubstring02[1];
+		        
+		        System.out.println(responsesubstring03);
+		        
+		        String responsesubstring04[]=responsesubstring03.split(":");
+		        
+		        System.out.println(responsesubstring04[1]);
+		        
+		        String responsesubstring05[]=responsesubstring04[1].split("\"");
+		        
+		        System.out.println( responsesubstring05[1]);
+		        
+		        String responsesubstring06[]=responsesubstring05[1].split("-");
+		        //year
+		        System.out.println(responsesubstring06[0]);
+		        
+		        //month
+		        
+		        System.out.println(responsesubstring06[1]);
+		        //date
+		        
+		        System.out.println(responsesubstring06[2]);
+		        String responsesubstring07[]=responsesubstring06[2].split("T");
+		        System.out.println(responsesubstring07[0]);
+		        
+		        String responsesubstring08=responsesubstring06[1].toString();
+		        
+		        String responsesubstring09 = responsesubstring06[0].toString();
+		        
+		        String responsesubstring10 =responsesubstring07[0].toString();
+		        
+		        int yearapi=Integer.parseInt(responsesubstring09);
+		        
+		        int monthapi = Integer.parseInt(responsesubstring08);
+		        
+		        int dateapi = Integer.parseInt(responsesubstring10);
+		        
+		        System.out.println(yearapi+"IS THE YEAR FROM API");
+		        
+		        System.out.println(monthapi+"IS THE MONTH FROM API");
+		        
+		        System.out.println(dateapi+"IS THE DATE FROM API");
+		        
+		        
+		        
+		        WebElement expirydate= driver.findElement(By.xpath("//*[contains(text(),'Expiry Date:')]/.."));
+    	        
+    	        String expirydatetext = expirydate.getText();
+    	        
+    	        System.out.println(expirydatetext+"is the expiry date from UI");
+    	        
+    	        
+    	        String responsesubstring11[]=expirydatetext.split(":");
+    	        
+    	        String responsesubstring12=responsesubstring11[1];
+    	        
+    	        String responsesubstring13[] =responsesubstring12.split(",");
+    	        
+    	        String responsesubstring14=responsesubstring13[0];
+    	        
+    	        System.out.println(responsesubstring14);
+    	        
+    	        String responsesubstring15=responsesubstring14.trim();
+    	        
+    	        System.out.println(responsesubstring15);
+    	        
+    	        String responsesubstring16 = responsesubstring15.substring(0, 3);
+    	        
+    	        System.out.println(responsesubstring16);
+    	        
+    	        String responsesubstring17 = responsesubstring15.substring(4,6);
+    	        
+    	        System.out.println(responsesubstring17);
+    	        
+    	        
+    	        Date date = new SimpleDateFormat("MMMM").parse(responsesubstring16);
+    	        Calendar cal = Calendar.getInstance();
+    	        cal.setTime(date);
+    	        System.out.println(cal.get(Calendar.MONTH));
+    	        
+    	        int monthui = cal.get(Calendar.MONTH)+1;
+    	        
+    	        System.out.println(monthui+" is the month from UI");
+    	        
+    	        int dateui = Integer.parseInt(responsesubstring17);
+    	        
+    	        System.out.println(dateui+" is the date from UI");
+    	        
+    	        //nOW PERFORMING TO GET YEAR
+    	        
+    	        String responsesubstring18[]=expirydatetext.split(",");
+    	        
+    	        System.out.println(responsesubstring18[1]);
+    	        
+    	        String responsesubstring19=responsesubstring18[1].trim();
+    	        
+    	        System.out.println(responsesubstring19);
+    	        
+    	        String responsesubstring20=responsesubstring19.substring(0, 4);
+    	        
+    	        System.out.println(responsesubstring20);
+    	        
+    	        int yearui=Integer.parseInt(responsesubstring20);
+    	        
+    	        System.out.println(yearui+"is the year from UI");
+    	        
+    	        
+    	        if (yearapi==yearui)
+    	        {
+    	        	
+    	        	ScreenshotCapture.takeScreenShot(driver);
+    	        	Log.info("The year is matching");
+    	        	System.out.println("The year is matching");
+    	        	DriverScript.bResult = true;
+    	        }
+    	        
+    	        else
+    	        {
+    	        	
+    	        	ScreenshotCapture.takeScreenShot(driver);
+    	        	Log.info("The year is not matching");
+    	        	System.out.println("The year is not matching");
+    	        	DriverScript.bResult = false;
+    	        }
+    	        
+    	        
+    	        if (monthapi==monthui)
+    	        {
+    	        	
+    	        	ScreenshotCapture.takeScreenShot(driver);
+    	        	Log.info("The month is matching");
+    	        	System.out.println("The month is matching");
+    	        	DriverScript.bResult = true;
+    	        }
+    	        
+    	        else
+    	        {
+    	        	ScreenshotCapture.takeScreenShot(driver);
+    	        
+    	        	Log.info("The month is not matching");
+    	        	System.out.println("The month is not matching");
+    	        	DriverScript.bResult = false;
+    	        }
+    	        
+    	        if (dateapi==dateui)
+    	        {
+    	        	ScreenshotCapture.takeScreenShot(driver);
+    	        	Log.info("The date is matching");
+    	        	System.out.println("The date is matching");
+    	        	DriverScript.bResult = true;
+    	        }
+    	        
+    	        else
+    	        {
+    	        	ScreenshotCapture.takeScreenShot(driver);
+    	        
+    	        	Log.info("The date is not matching");
+    	        	System.out.println("The date is not matching");
+    	        	DriverScript.bResult = false;
+    	        }
+	}
+    	        
+    	        
+    	        
+    	        
+    	        
+    	        
+   catch(Exception e)
+		{
+			
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.info(e.getMessage());
+			
+			DriverScript.bResult = false;
+		}
+		
+
+
+
+}
+
+
+
+public static void verifyIC300expirydate(String object, String data)
+{
+	
+	
+	try {
+		final String POST_PARAMS = "{\n" + "\"Username\":\"icautoadmin02\",\r\n" +
+		        "    \"Password\":\"Honeywell123\",\r\n" + "\n}";
+		    System.out.println(POST_PARAMS);
+		    URL obj = new URL("https://mtswebapiic200.azurewebsites.net/api/users?clienttype=1");
+		    HttpURLConnection postConnection = (HttpURLConnection) obj.openConnection();
+		    postConnection.setRequestMethod("POST");
+		    postConnection.setRequestProperty("clienttype", "1");
+		   postConnection.setRequestProperty("Content-Type", "application/json");
+		    postConnection.setDoOutput(true);
+		    OutputStream os = postConnection.getOutputStream();
+		    os.write(POST_PARAMS.getBytes());
+		    os.flush();
+		    os.close();
+		    int responseCode = postConnection.getResponseCode();
+		    System.out.println("POST Response Code :  " + responseCode);
+		    System.out.println("POST Response Message : " + postConnection.getResponseMessage());
+		    BufferedReader in = new BufferedReader(new InputStreamReader(
+		          postConnection.getInputStream()));
+		      String inputLine;
+		      StringBuffer response = new StringBuffer();
+		      while ((inputLine = in .readLine()) != null) {
+		          response.append(inputLine);
+		      } in .close();
+		       
+		      String accesstoken =response.toString();
+		      System.out.println(response.toString());
+		      System.out.println(accesstoken);
+		      
+		      String accesstokensubstring[] = accesstoken.split(":");
+		      
+		      String acesstokensubstring2[]=accesstokensubstring[1].split(",");
+		      		      
+		      String actualtoken=acesstokensubstring2[0];
+		      
+		      String actualtoken1=actualtoken.substring(1, actualtoken.length()-1);
+		      
+		      System.out.println(acesstokensubstring2[0].toString()+"is the access token");
+		      
+		      System.out.println(actualtoken1+"is the new token");
+		   
+		      
+		      URL obj1 = new URL("https://mtsadminwebapiic200.azurewebsites.net/api/license/getlicenseinfo");
+		      HttpURLConnection postConnection1 = (HttpURLConnection) obj1.openConnection();
+		      postConnection1.setRequestMethod("GET");
+		      postConnection1.setRequestProperty("Authorization", "Bearer "+actualtoken1);
+		      postConnection1.setRequestProperty("Content-Type", "application/json");
+		      postConnection1.setDoOutput(true);
+		      int responseCode1 = postConnection1.getResponseCode();
+		      System.out.println("POST Response Code :  " + responseCode1);
+		      System.out.println("POST Response Message : " + postConnection1.getResponseMessage());
+		      BufferedReader in1 = new BufferedReader(new InputStreamReader(
+		            postConnection1.getInputStream()));
+		        String inputLine1;
+		        StringBuffer response1 = new StringBuffer();
+		        while ((inputLine1 = in1 .readLine()) != null) {
+		            response1.append(inputLine1);
+		        } in1 .close();
+		        
+		        
+		        System.out.println(response1.toString());
+		        
+		        Log.info(response1.toString());
+		        
+		        
+		        String responsesubstring01=response1.toString();
+		        
+		        String responsesubstring02[] = responsesubstring01.split("expiryDate");
+		        
+		        String responsesubstring03=responsesubstring02[1];
+		        
+		        System.out.println(responsesubstring03);
+		        
+		        String responsesubstring04[]=responsesubstring03.split(":");
+		        
+		        System.out.println(responsesubstring04[1]);
+		        
+		        String responsesubstring05[]=responsesubstring04[1].split("\"");
+		        
+		        System.out.println( responsesubstring05[1]);
+		        
+		        String responsesubstring06[]=responsesubstring05[1].split("-");
+		        //year
+		        System.out.println(responsesubstring06[0]);
+		        
+		        //month
+		        
+		        System.out.println(responsesubstring06[1]);
+		        //date
+		        
+		        System.out.println(responsesubstring06[2]);
+		        String responsesubstring07[]=responsesubstring06[2].split("T");
+		        System.out.println(responsesubstring07[0]);
+		        
+		        String responsesubstring08=responsesubstring06[1].toString();
+		        
+		        String responsesubstring09 = responsesubstring06[0].toString();
+		        
+		        String responsesubstring10 =responsesubstring07[0].toString();
+		        
+		        int yearapi=Integer.parseInt(responsesubstring09);
+		        
+		        int monthapi = Integer.parseInt(responsesubstring08);
+		        
+		        int dateapi = Integer.parseInt(responsesubstring10);
+		        
+		        System.out.println(yearapi+"IS THE YEAR FROM API");
+		        
+		        System.out.println(monthapi+"IS THE MONTH FROM API");
+		        
+		        System.out.println(dateapi+"IS THE DATE FROM API");
+		        
+		        
+		        
+		        WebElement expirydate= driver.findElement(By.xpath("//*[contains(text(),'Expiry Date:')]/.."));
+    	        
+    	        String expirydatetext = expirydate.getText();
+    	        
+    	        System.out.println(expirydatetext+"is the expiry date from UI");
+    	        
+    	        
+    	        String responsesubstring11[]=expirydatetext.split(":");
+    	        
+    	        String responsesubstring12=responsesubstring11[1];
+    	        
+    	        String responsesubstring13[] =responsesubstring12.split(",");
+    	        
+    	        String responsesubstring14=responsesubstring13[0];
+    	        
+    	        System.out.println(responsesubstring14);
+    	        
+    	        String responsesubstring15=responsesubstring14.trim();
+    	        
+    	        System.out.println(responsesubstring15);
+    	        
+    	        String responsesubstring16 = responsesubstring15.substring(0, 3);
+    	        
+    	        System.out.println(responsesubstring16);
+    	        
+    	        String responsesubstring17 = responsesubstring15.substring(4,6);
+    	        
+    	        System.out.println(responsesubstring17);
+    	        
+    	        
+    	        Date date = new SimpleDateFormat("MMMM").parse(responsesubstring16);
+    	        Calendar cal = Calendar.getInstance();
+    	        cal.setTime(date);
+    	        System.out.println(cal.get(Calendar.MONTH));
+    	        
+    	        int monthui = cal.get(Calendar.MONTH)+1;
+    	        
+    	        System.out.println(monthui+" is the month from UI");
+    	        
+    	        int dateui = Integer.parseInt(responsesubstring17);
+    	        
+    	        System.out.println(dateui+" is the date from UI");
+    	        
+    	        //nOW PERFORMING TO GET YEAR
+    	        
+    	        String responsesubstring18[]=expirydatetext.split(",");
+    	        
+    	        System.out.println(responsesubstring18[1]);
+    	        
+    	        String responsesubstring19=responsesubstring18[1].trim();
+    	        
+    	        System.out.println(responsesubstring19);
+    	        
+    	        String responsesubstring20=responsesubstring19.substring(0, 4);
+    	        
+    	        System.out.println(responsesubstring20);
+    	        
+    	        int yearui=Integer.parseInt(responsesubstring20);
+    	        
+    	        System.out.println(yearui+"is the year from UI");
+    	        
+    	        
+    	        if (yearapi==yearui)
+    	        {
+    	        	
+    	        	ScreenshotCapture.takeScreenShot(driver);
+    	        	Log.info("The year is matching");
+    	        	System.out.println("The year is matching");
+    	        	DriverScript.bResult = true;
+    	        }
+    	        
+    	        else
+    	        {
+    	        	
+    	        	ScreenshotCapture.takeScreenShot(driver);
+    	        	Log.info("The year is not matching");
+    	        	System.out.println("The year is not matching");
+    	        	DriverScript.bResult = false;
+    	        }
+    	        
+    	        
+    	        if (monthapi==monthui)
+    	        {
+    	        	
+    	        	ScreenshotCapture.takeScreenShot(driver);
+    	        	Log.info("The month is matching");
+    	        	System.out.println("The month is matching");
+    	        	DriverScript.bResult = true;
+    	        }
+    	        
+    	        else
+    	        {
+    	        	ScreenshotCapture.takeScreenShot(driver);
+    	        
+    	        	Log.info("The month is not matching");
+    	        	System.out.println("The month is not matching");
+    	        	DriverScript.bResult = false;
+    	        }
+    	        
+    	        if (dateapi==dateui)
+    	        {
+    	        	ScreenshotCapture.takeScreenShot(driver);
+    	        	Log.info("The date is matching");
+    	        	System.out.println("The date is matching");
+    	        	DriverScript.bResult = true;
+    	        }
+    	        
+    	        else
+    	        {
+    	        	ScreenshotCapture.takeScreenShot(driver);
+    	        
+    	        	Log.info("The date is not matching");
+    	        	System.out.println("The date is not matching");
+    	        	DriverScript.bResult = false;
+    	        }
+	}
+    	        
+    	        
+    	        
+    	        
+    	        
+    	        
+   catch(Exception e)
+		{
+			
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.info(e.getMessage());
+			
+			DriverScript.bResult = false;
+		}
+		
+
+
+
+}
+
+
+public static void offtraineeaction(String object, String data)
+{
+	driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+	
+	try {
+	List<WebElement> actionnames= driver.findElements(By.xpath("//*[@ng-repeat='action in actionNames']"));	
+	int i;
+	for (i=0;i<actionnames.size();i++)
+	{
+		String actiontext= actionnames.get(i).getText();
+		
+		Log.info(actiontext);
+		if(actiontext.contains(data))
+		{
+		Log.info("Text is matching");
+		
+		
+			//*[@ng-repeat='action in trainerActions'][4]/*/*
+		
+		int b = i+1;
+		
+
+		
+		//*[@ng-repeat='action in trainerActions'][4]/*/div[@class='toggle btn btn-primary']/* if on the class will be toggle btn btn-primary
+		
+		
+		//if off class = toggle btn btn-default off
+		try {
+			WebElement traineractions= driver.findElement(By.xpath("//*[@ng-repeat='action in traineeActions']["+b+"]/*/div[@class='toggle btn btn-primary']/*"));
+			
+			System.out.println(i);
+			
+			Highlight.highlightElement(traineractions);
+			
+			JavascriptExecutor executor = (JavascriptExecutor)driver;
+			executor.executeScript("arguments[0].click();", traineractions);
+		//	traineractions.click();
+			DriverScript.bResult = true;	
+			
+		}
+		
+		catch(Exception e)
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.info("Switch is already off");
+			
+			DriverScript.bResult = false;
+		}
+			
+		}
+		
+		else
+		{
+			Log.info("There is no permission with the given text");
+			System.out.println("There is no permission with the given text");
+			//DriverScript.bResult = false;
+			
+		}
+		
+		
+	}
+	
+	}
+	
+	
+	catch(Exception e)
+	{
+		
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.info(e.getMessage());
+		
+		DriverScript.bResult = false;
+	}
+	
+	
+	
+	
+	
+	
+}
+
+public static void ontraineeaction(String object, String data)
+{
+	driver.manage().timeouts().implicitlyWait(30, TimeUnit.SECONDS);
+	try {
+	List<WebElement> actionnames= driver.findElements(By.xpath("//*[@ng-repeat='action in actionNames']"));	
+	int i;
+	for (i=0;i<actionnames.size();i++)
+	{
+		String actiontext= actionnames.get(i).getText();
+		
+		Log.info(actiontext);
+		if(actiontext.contains(data))
+		{
+		Log.info("Text is matching");
+		
+		
+			//*[@ng-repeat='action in trainerActions'][4]/*/*
+		
+		int b = i+1;
+		
+
+		
+		//*[@ng-repeat='action in trainerActions'][4]/*/div[@class='toggle btn btn-primary']/* if on the class will be toggle btn btn-primary
+		
+		
+		//if off class = toggle btn btn-default off
+		try {
+			WebElement traineractions= driver.findElement(By.xpath("//*[@ng-repeat='action in traineeActions']["+b+"]/*/div[@class='toggle btn btn-default off']/*"));
+			
+			System.out.println(i);
+			
+			Highlight.highlightElement(traineractions);
+			
+			JavascriptExecutor executor = (JavascriptExecutor)driver;
+			executor.executeScript("arguments[0].click();", traineractions);
+		//	traineractions.click();
+			DriverScript.bResult = true;	
+			
+		}
+		
+		catch(Exception e)
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.info("Switch is already on");
+			
+			DriverScript.bResult = false;
+		}
+			
+		}
+		
+		else
+		{
+			ScreenshotCapture.takeScreenShot(driver);
+			Log.info("There is no permission with the given text");
+			System.out.println("There is no permission with the given text");
+			//DriverScript.bResult = false;
+			
+		}
+		
+		
+	}
+	
+	}
+	
+	
+	catch(Exception e)
+	{
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.info(e.getMessage());
+		
+		DriverScript.bResult = false;
+	}
+	
+	
+	
+	
+	
+	
+}
+
+
+public static void verifyElementNotDisabled(String object, String data){
+	try {
+		
+		driver.manage().timeouts().implicitlyWait(40, TimeUnit.SECONDS);
+		Log.info("Verify Element Disabled " + object);
+		String eenabled = objectLocator(object).getAttribute("class");
+		System.out.println(eenabled);
+		if (eenabled.contains("disable")) {
+			
+			ScreenshotCapture.takeScreenShot(driver);
+			Highlight.highlightElement(objectLocator(object));
+			Log.error("Element is disabled");
+			System.out.println("Element is disabled");
+			
+			DriverScript.failedException = "Element is disabled";
+			DriverScript.bResult = false;
+			
+		} else {
+			ScreenshotCapture.takeScreenShot(driver);
+			Highlight.highlightElement(objectLocator(object));
+			Log.info("Element is enabled");
+			System.out.println("Element is enabled");
+			DriverScript.bResult = true;
+			
+		}
+	} catch (Exception e) {
+		ScreenshotCapture.takeScreenShot(driver);
+		Log.error("Not able to locate element --- " + e.getMessage());
+		DriverScript.bResult = false;
+		DriverScript.failedException = e.getMessage();
+	}
+}
+
+
+public static void verifyloginpageloadtime(String object,String data)
+{
+	
+	
+	long start = System.currentTimeMillis();
+	
+	//System.out.println(start+"is the start time");
+
+	driver.get(data);
+
+	long finish = System.currentTimeMillis();
+	
+	//System.out.println(finish+"is the end time");
+	long totalTime = finish - start; 
+	System.out.println("Total Time for page load - "+totalTime); 
+	Log.info("Total Time for page load - "+totalTime);
+}
+
+public static void verifyelementloadtime(String object,String data)
+{
+	
+	
+	
+    
+    objectLocator(object).click();
+    
+    
+    
+    long start = System.currentTimeMillis();
+    
+   // System.out.println(start+"is the start time");
+    
+    WebDriverWait wait = new WebDriverWait(driver, 30);
+    
+   wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath(data)));
+    
+   // waituntilclickable(object, data);
+    
+//    driver.findElement(By.xpath(data));
+//    Highlight.highlightElement(driver.findElement(By.xpath(data)));
+    long finish = System.currentTimeMillis();
+    
+    System.out.println(finish+"is the end time");
+	long totalTime = finish - start; 
+	System.out.println("Total Time for page load - "+totalTime); 
+	Log.info("Total Time for page load - "+totalTime);
+
+   // pageLoad.stop();
+    
+//    long pageLoadTime_ms = pageLoad.getTime();
+//    long pageLoadTime_Seconds = pageLoadTime_ms / 1000;
+//    System.out.println("Total Page Load Time: " + pageLoadTime_ms + " milliseconds");
+//    System.out.println("Total Page Load Time: " + pageLoadTime_Seconds + " seconds");
+	
+	
+	
+	
+}
+
+
+
+
+
+
+
+}
+
+
 
 
 

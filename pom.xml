@@ -119,12 +119,12 @@
     		<version>1.0.0.Alpha</version>
 		</dependency>
 		
-		<!-- https://mvnrepository.com/artifact/org.sikuli/sikuli-core -->
-		<dependency>
-    		<groupId>com.sikulix</groupId>
-    		<artifactId>sikulixapi</artifactId>
-    		<version>1.1.0</version>
-		</dependency>
+		
+		
+		
+	
+
+		
 	</dependencies>
 	
 	<profiles>
